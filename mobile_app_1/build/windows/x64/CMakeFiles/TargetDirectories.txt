@@ -1,0 +1,10 @@
+D:/University_files/Courses/Mobile_programming/Project/Mobile--app/mobile_app_1/build/windows/x64/CMakeFiles/INSTALL.dir
+D:/University_files/Courses/Mobile_programming/Project/Mobile--app/mobile_app_1/build/windows/x64/CMakeFiles/ALL_BUILD.dir
+D:/University_files/Courses/Mobile_programming/Project/Mobile--app/mobile_app_1/build/windows/x64/CMakeFiles/ZERO_CHECK.dir
+D:/University_files/Courses/Mobile_programming/Project/Mobile--app/mobile_app_1/build/windows/x64/flutter/CMakeFiles/flutter_wrapper_plugin.dir
+D:/University_files/Courses/Mobile_programming/Project/Mobile--app/mobile_app_1/build/windows/x64/flutter/CMakeFiles/flutter_wrapper_app.dir
+D:/University_files/Courses/Mobile_programming/Project/Mobile--app/mobile_app_1/build/windows/x64/flutter/CMakeFiles/flutter_assemble.dir
+D:/University_files/Courses/Mobile_programming/Project/Mobile--app/mobile_app_1/build/windows/x64/flutter/CMakeFiles/INSTALL.dir
+D:/University_files/Courses/Mobile_programming/Project/Mobile--app/mobile_app_1/build/windows/x64/runner/CMakeFiles/mobile_app_1.dir
+D:/University_files/Courses/Mobile_programming/Project/Mobile--app/mobile_app_1/build/windows/x64/runner/CMakeFiles/INSTALL.dir
+D:/University_files/Courses/Mobile_programming/Project/Mobile--app/mobile_app_1/build/windows/x64/runner/CMakeFiles/ALL_BUILD.dir

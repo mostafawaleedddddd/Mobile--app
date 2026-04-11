@@ -1,0 +1,28 @@
+^D:\UNIVERSITY_FILES\COURSES\MOBILE_PROGRAMMING\PROJECT\MOBILE--APP\MOBILE_APP_1\BUILD\WINDOWS\X64\CMAKEFILES\A2AFA0AF842B3605F1B5EE8A8711D442\FLUTTER_WINDOWS.DLL.RULE
+setlocal
+"C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E env FLUTTER_ROOT=D:\University_files\flutter\flutter PROJECT_DIR=D:\University_files\Courses\Mobile_programming\Project\Mobile--app\mobile_app_1 FLUTTER_ROOT=D:\University_files\flutter\flutter FLUTTER_EPHEMERAL_DIR=D:\University_files\Courses\Mobile_programming\Project\Mobile--app\mobile_app_1\windows\flutter\ephemeral PROJECT_DIR=D:\University_files\Courses\Mobile_programming\Project\Mobile--app\mobile_app_1 FLUTTER_TARGET=D:\University_files\Courses\Mobile_programming\Project\Mobile--app\mobile_app_1\lib\Login_Signup.dart DART_DEFINES=RkxVVFRFUl9WRVJTSU9OPTMuNDEuMQ==,RkxVVFRFUl9DSEFOTkVMPXN0YWJsZQ==,RkxVVFRFUl9HSVRfVVJMPWh0dHBzOi8vZ2l0aHViLmNvbS9mbHV0dGVyL2ZsdXR0ZXIuZ2l0,RkxVVFRFUl9GUkFNRVdPUktfUkVWSVNJT049NTgyYTBlN2M1NQ==,RkxVVFRFUl9FTkdJTkVfUkVWSVNJT049MzQ1MmQ3MzViZA==,RkxVVFRFUl9EQVJUX1ZFUlNJT049My4xMS4w DART_OBFUSCATION=false TRACK_WIDGET_CREATION=true TREE_SHAKE_ICONS=false PACKAGE_CONFIG=D:\University_files\Courses\Mobile_programming\Project\Mobile--app\mobile_app_1\.dart_tool\package_config.json D:/University_files/flutter/flutter/packages/flutter_tools/bin/tool_backend.bat windows-x64 Debug
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^D:\UNIVERSITY_FILES\COURSES\MOBILE_PROGRAMMING\PROJECT\MOBILE--APP\MOBILE_APP_1\BUILD\WINDOWS\X64\CMAKEFILES\14EE90B8417CA3E6C4F8C715075BFD42\FLUTTER_ASSEMBLE.RULE
+setlocal
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^D:\UNIVERSITY_FILES\COURSES\MOBILE_PROGRAMMING\PROJECT\MOBILE--APP\MOBILE_APP_1\WINDOWS\FLUTTER\CMAKELISTS.TXT
+setlocal
+"C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -SD:/University_files/Courses/Mobile_programming/Project/Mobile--app/mobile_app_1/windows -BD:/University_files/Courses/Mobile_programming/Project/Mobile--app/mobile_app_1/build/windows/x64 --check-stamp-file D:/University_files/Courses/Mobile_programming/Project/Mobile--app/mobile_app_1/build/windows/x64/flutter/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

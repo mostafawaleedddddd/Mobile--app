@@ -1,0 +1,1 @@
+ D:\\University_files\\Courses\\Mobile_programming\\Project\\Mobile--app\\mobile_app_1\\.dart_tool\\flutter_build\\23290ed1bd78d89badef59ec88f34259\\native_assets.json: 

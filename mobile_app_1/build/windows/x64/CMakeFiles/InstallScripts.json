@@ -1,0 +1,9 @@
+{
+	"InstallScripts" : 
+	[
+		"D:/University_files/Courses/Mobile_programming/Project/Mobile--app/mobile_app_1/build/windows/x64/cmake_install.cmake",
+		"D:/University_files/Courses/Mobile_programming/Project/Mobile--app/mobile_app_1/build/windows/x64/flutter/cmake_install.cmake",
+		"D:/University_files/Courses/Mobile_programming/Project/Mobile--app/mobile_app_1/build/windows/x64/runner/cmake_install.cmake"
+	],
+	"Parallel" : false
+}
