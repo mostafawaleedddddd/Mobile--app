@@ -1,30 +1,19 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'User_profile.dart';
 
-void main() {
-  runApp(const MyApp());
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Auth',
-      debugShowCheckedModeBanner: false,
-      home: const AuthScreen(),
-    );
-  }
-}
-
 // ─── COLORS ────────────────────────────
-const _blue      = Color(0xFF3B82F6);
-const _textDark  = Color(0xFF1E293B);
-const _textGrey  = Color(0xFF64748B);
-const _border    = Color(0xFFCBD5E1);
-const _fieldBg   = Color(0xFFF8FAFC);
+const _blue     = Color(0xFF3B82F6);
+const _textDark = Color(0xFF1E293B);
+const _textGrey = Color(0xFF64748B);
+const _border   = Color(0xFFCBD5E1);
+const _fieldBg  = Color(0xFFF8FAFC);
+
+// ─── GET SUPABASE CLIENT ───────────────
+// NO main() here — main() lives in home.dart only
+// We get the client like this instead:
+final supabase = Supabase.instance.client;
 
 // ─── AUTH SCREEN ───────────────────────
 class AuthScreen extends StatefulWidget {
@@ -69,20 +58,16 @@ class _AuthScreenState extends State<AuthScreen>
       backgroundColor: const Color(0xFFF0F7FF),
       body: Stack(
         children: [
-          // top-left soft circle
           Positioned(
             top: -sh * 0.07,
             left: -sw * 0.18,
             child: _Blob(size: sw * 0.85, color: _blue.withOpacity(0.09)),
           ),
-          // bottom-right soft circle
           Positioned(
             bottom: -sh * 0.06,
             right: -sw * 0.14,
             child: _Blob(size: sw * 0.65, color: _blue.withOpacity(0.07)),
           ),
-
-          // scrollable card area
           SafeArea(
             child: Center(
               child: SingleChildScrollView(
@@ -174,9 +159,64 @@ class _LoginCard extends StatefulWidget {
 }
 
 class _LoginCardState extends State<_LoginCard> {
-  final _formKey = GlobalKey<FormState>();
+  final _formKey   = GlobalKey<FormState>();
   final _emailCtrl = TextEditingController();
-  final _passCtrl = TextEditingController();
+  final _passCtrl  = TextEditingController();
+  bool _isLoading  = false;
+
+  @override
+  void dispose() {
+    _emailCtrl.dispose();
+    _passCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submitLogin() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      // search DB for a user matching this email AND password
+      final data = await Supabase.instance.client
+          .from('User_profile')
+          .select()
+          .eq('email', _emailCtrl.text.trim())
+          .eq('password', _passCtrl.text.trim())
+          .maybeSingle(); // ← maybeSingle returns null instead of throwing if not found
+
+      if (data == null) {
+        // no user found with that email + password
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Invalid email or password. Please try again.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      // user found — navigate to THEIR profile using their id
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ProfileScreen(id: data['id'] as int),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -207,7 +247,8 @@ class _LoginCardState extends State<_LoginCard> {
               keyboardType: TextInputType.emailAddress,
               validator: (v) {
                 if (v == null || v.trim().isEmpty) return 'Email is required';
-                if (!RegExp(r'^[\w\.-]+@[\w\.-]+\.\w{2,}$').hasMatch(v.trim())) {
+                if (!RegExp(r'^[\w\.-]+@[\w\.-]+\.\w{2,}$')
+                    .hasMatch(v.trim())) {
                   return 'Enter a valid email';
                 }
                 return null;
@@ -249,20 +290,29 @@ class _LoginCardState extends State<_LoginCard> {
             ),
 
             const SizedBox(height: 20),
-            // Inside Login_Signup.dart -> _LoginCardState
-              _PrimaryButton(
-                label: 'Sign In',
-                onTap: () {
-                  if (_formKey.currentState!.validate()) {
-                    // This is where you'd normally check your database
-                    // For now, let's trigger the navigation:
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(builder: (context) => const ProfileScreen()),
-                    );
-                  }
-                },
+
+            // ── Sign In Button ──
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                onPressed: _isLoading ? null : _submitLogin,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _blue,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+                child: _isLoading
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Text('Sign In',
+                        style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.3)),
               ),
+            ),
 
             const SizedBox(height: 18),
             Center(
@@ -289,13 +339,62 @@ class _RegisterCard extends StatefulWidget {
 }
 
 class _RegisterCardState extends State<_RegisterCard> {
-  final _formKey = GlobalKey<FormState>();
+  final _formKey     = GlobalKey<FormState>();
   final _nameCtrl    = TextEditingController();
   final _emailCtrl   = TextEditingController();
   final _phoneCtrl   = TextEditingController();
   final _passCtrl    = TextEditingController();
   final _confirmCtrl = TextEditingController();
-  String _type = 'Student';
+  String _type       = 'Student';
+  bool _isLoading    = false;
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _emailCtrl.dispose();
+    _phoneCtrl.dispose();
+    _passCtrl.dispose();
+    _confirmCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submitRegister() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      // insert into DB and get back the new row with its id
+      final inserted = await Supabase.instance.client
+          .from('User_profile')
+          .insert({
+            'name':         _nameCtrl.text.trim(),
+            'email':        _emailCtrl.text.trim(),
+            'phone':        _phoneCtrl.text.trim(),
+            'password':     _passCtrl.text,
+            'account_type': _type,
+          })
+          .select()
+          .single();
+
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ProfileScreen(id: inserted['id'] as int),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -317,7 +416,6 @@ class _RegisterCardState extends State<_RegisterCard> {
 
             const SizedBox(height: 20),
 
-            // ── Account type (no box) ──
             _Label('Account type'),
             const SizedBox(height: 4),
             Row(
@@ -366,7 +464,8 @@ class _RegisterCardState extends State<_RegisterCard> {
               keyboardType: TextInputType.emailAddress,
               validator: (v) {
                 if (v == null || v.trim().isEmpty) return 'Email is required';
-                if (!RegExp(r'^[\w\.-]+@[\w\.-]+\.\w{2,}$').hasMatch(v.trim())) {
+                if (!RegExp(r'^[\w\.-]+@[\w\.-]+\.\w{2,}$')
+                    .hasMatch(v.trim())) {
                   return 'Enter a valid email';
                 }
                 return null;
@@ -421,9 +520,28 @@ class _RegisterCardState extends State<_RegisterCard> {
             ),
 
             const SizedBox(height: 22),
-            _PrimaryButton(
-              label: 'Create Account',
-              onTap: () => _formKey.currentState!.validate(),
+
+            // ── Create Account Button ──
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                onPressed: _isLoading ? null : _submitRegister,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _blue,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+                child: _isLoading
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Text('Create Account',
+                        style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.3)),
+              ),
             ),
 
             const SizedBox(height: 16),
@@ -441,7 +559,7 @@ class _RegisterCardState extends State<_RegisterCard> {
   }
 }
 
-// ─── RADIO OPTION (plain, no box) ──────
+// ─── RADIO OPTION ──────────────────────
 class _RadioOption extends StatelessWidget {
   final String label;
   final String value;
@@ -480,14 +598,11 @@ class _RadioOption extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: selected ? _blue : _textGrey,
-            ),
-          ),
+          Text(label,
+              style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: selected ? _blue : _textGrey)),
         ],
       ),
     );
@@ -503,7 +618,9 @@ class _Label extends StatelessWidget {
   Widget build(BuildContext context) => Text(
         text,
         style: const TextStyle(
-            fontSize: 13, fontWeight: FontWeight.w600, color: _textDark),
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: _textDark),
       );
 }
 
@@ -593,39 +710,6 @@ class _FieldState extends State<_Field> {
   }
 }
 
-// ─── SHARED: PRIMARY BUTTON ────────────
-class _PrimaryButton extends StatelessWidget {
-  final String label;
-  final VoidCallback onTap;
-  const _PrimaryButton({required this.label, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: 50,
-      child: ElevatedButton(
-        onPressed: onTap,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: _blue,
-          foregroundColor: Colors.white,
-          elevation: 0,
-          shadowColor: Colors.transparent,
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12)),
-        ),
-        child: Text(
-          label,
-          style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.3),
-        ),
-      ),
-    );
-  }
-}
-
 // ─── SHARED: INKWELL LINK ──────────────
 class _InkLink extends StatelessWidget {
   final String plain;
@@ -645,8 +729,7 @@ class _InkLink extends StatelessWidget {
         splashColor: _blue.withOpacity(0.12),
         highlightColor: _blue.withOpacity(0.06),
         child: Padding(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
           child: RichText(
             text: TextSpan(
               children: [
