@@ -393,10 +393,12 @@ class _SurveyScreenState extends State<SurveyScreen>
 
   // ── submit button ────────────────────────────
   Widget _buildSubmitButton() {
-    return GestureDetector(
-      onTap: _isSubmitting ? null : _submit,
-      child: Container(
-        width: double.infinity, height: 56,
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(18),
+      child: Ink(
+        width: double.infinity,
+        height: 56,
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             colors: [_accentBlue, _accentPurple],
@@ -409,13 +411,17 @@ class _SurveyScreenState extends State<SurveyScreen>
                 blurRadius: 22, offset: const Offset(0, 8)),
           ],
         ),
-        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: const [
-          Icon(Icons.send_rounded, color: _white, size: 20),
-          SizedBox(width: 10),
-          Text('Submit Survey', style: TextStyle(
-              color: _white, fontSize: 16,
-              fontWeight: FontWeight.w800, letterSpacing: 0.3)),
-        ]),
+        child: InkWell(
+          onTap: _isSubmitting ? null : _submit,
+          borderRadius: BorderRadius.circular(18),
+          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: const [
+            Icon(Icons.send_rounded, color: _white, size: 20),
+            SizedBox(width: 10),
+            Text('Submit Survey', style: TextStyle(
+                color: _white, fontSize: 16,
+                fontWeight: FontWeight.w800, letterSpacing: 0.3)),
+          ]),
+        ),
       ),
     );
   }

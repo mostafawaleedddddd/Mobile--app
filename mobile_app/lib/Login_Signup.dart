@@ -1,7 +1,9 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'StudentHome.dart';
 import 'User_profile.dart';
+import 'app_session.dart';
 
 // ─── COLORS ────────────────────────────
 const _blue     = Color(0xFF3B82F6);
@@ -199,11 +201,16 @@ class _LoginCardState extends State<_LoginCard> {
       }
 
       // user found — navigate to THEIR profile using their id
+      AppSession.setUser(
+        userEmail: (data['email'] as String?) ?? _emailCtrl.text.trim(),
+        id: data['id'] as int,
+      );
+
       if (mounted) {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (_) => ProfileScreen(id: data['id'] as int),
+            builder: (_) => HomePage(userId: data['id'] as int),
           ),
         );
       }
@@ -376,6 +383,11 @@ class _RegisterCardState extends State<_RegisterCard> {
           })
           .select()
           .single();
+
+      AppSession.setUser(
+        userEmail: (inserted['email'] as String?) ?? _emailCtrl.text.trim(),
+        id: inserted['id'] as int,
+      );
 
       if (mounted) {
         Navigator.pushReplacement(

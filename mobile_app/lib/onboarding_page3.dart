@@ -255,20 +255,27 @@ class _GetStartedButton extends StatelessWidget {
   const _GetStartedButton({required this.color, required this.onTap});
 
   @override
-  Widget build(BuildContext context) => GestureDetector(
-        onTap: onTap,
-        child: Container(
+  Widget build(BuildContext context) => Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(30),
+        child: Ink(
           height: 50,
-          padding: const EdgeInsets.symmetric(horizontal: 24),
           decoration: BoxDecoration(
             color: color,
             borderRadius: BorderRadius.circular(30),
             boxShadow: [BoxShadow(color: color.withOpacity(0.35), blurRadius: 20, offset: const Offset(0, 8))],
           ),
-          child: const Center(
-            child: Text(
-              'Get Started',
-              style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700, letterSpacing: 0.3),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(30),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24),
+              child: Center(
+                child: Text(
+                  'Get Started',
+                  style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700, letterSpacing: 0.3),
+                ),
+              ),
             ),
           ),
         ),

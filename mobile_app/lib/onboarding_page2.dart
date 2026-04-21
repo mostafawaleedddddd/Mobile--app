@@ -256,16 +256,22 @@ class _NextButton extends StatelessWidget {
   final VoidCallback onTap;
   const _NextButton({required this.color, required this.onTap});
   @override
-  Widget build(BuildContext context) => GestureDetector(
-        onTap: onTap,
-        child: Container(
-          width: 56, height: 56,
+  Widget build(BuildContext context) => Material(
+        color: Colors.transparent,
+        shape: const CircleBorder(),
+        child: Ink(
+          width: 56,
+          height: 56,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: color,
             boxShadow: [BoxShadow(color: color.withOpacity(0.35), blurRadius: 20, offset: const Offset(0, 8))],
           ),
-          child: const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 24),
+          child: InkWell(
+            onTap: onTap,
+            customBorder: const CircleBorder(),
+            child: const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 24),
+          ),
         ),
       );
 }

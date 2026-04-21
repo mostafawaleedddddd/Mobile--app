@@ -49,7 +49,6 @@ class OnboardingPage1 extends StatelessWidget {
               child: _OrbScene(sh: sh, sw: sw),
             ),
 
-            // ── Text + nav zone ───────────────────
             Expanded(
               flex: 45,
               child: Padding(
@@ -302,9 +301,10 @@ class _NextButton extends StatelessWidget {
   const _NextButton({required this.color, required this.onTap});
 
   @override
-  Widget build(BuildContext context) => GestureDetector(
-        onTap: onTap,
-        child: Container(
+  Widget build(BuildContext context) => Material(
+        color: Colors.transparent,
+        shape: const CircleBorder(),
+        child: Ink(
           width: 56,
           height: 56,
           decoration: BoxDecoration(
@@ -318,7 +318,11 @@ class _NextButton extends StatelessWidget {
               ),
             ],
           ),
-          child: const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 24),
+          child: InkWell(
+            onTap: onTap,
+            customBorder: const CircleBorder(),
+            child: const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 24),
+          ),
         ),
       );
 }

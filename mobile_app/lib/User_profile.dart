@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
+import 'StudentHome.dart';
 import 'survey.dart';
 
 // ─── COLORS ────────────────────────────
@@ -239,6 +240,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _fetchAll() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
     try {
       final user = await _db.from('User_profile').select().eq('id', widget.id).single();
@@ -246,6 +248,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final certs = await _db.from('Certificates').select().eq('user_id', widget.id).order('id', ascending: false);
       final internships = await _db.from('Internships').select().eq('user_id', widget.id).order('id', ascending: false);
       final surveyes = await _db.from('Survey').select('').eq('user_id', widget.id);
+      if (!mounted) return;
       setState(() {
         _user        = user;
         _info        = infoList.isNotEmpty ? infoList.first : null;
@@ -258,6 +261,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+  }
+
+  Future<void> _handleBottomNavTap(int index) async {
+    if (index == 0) {
+      await Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => HomePage(userId: widget.id)),
+      );
+      return;
+    }
+
+    if (_navIndex == index && index != 2) return;
+
+    setState(() => _navIndex = index);
+
+    if (index == 2) {
+      await _fetchAll();
     }
   }
 
@@ -757,7 +777,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       body: body,
       bottomNavigationBar: _BottomBar(
         currentIndex: _navIndex,
-        onTap: (i) => setState(() => _navIndex = i),
+        onTap: _handleBottomNavTap,
       ),
     );
   }
