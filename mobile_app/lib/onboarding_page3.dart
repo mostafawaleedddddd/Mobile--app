@@ -16,6 +16,8 @@ class OnboardingPage3 extends StatelessWidget {
   Widget build(BuildContext context) {
     final sh = MediaQuery.of(context).size.height;
     final sw = MediaQuery.of(context).size.width;
+    final titleSize = sw < 380 ? 28.0 : 32.0;
+    final bodySize = sw < 380 ? 14.0 : 15.0;
 
     return Scaffold(
       backgroundColor: _bg,
@@ -35,10 +37,10 @@ class OnboardingPage3 extends StatelessWidget {
                   children: [
                     const Spacer(),
 
-                    const Text(
+                    Text(
                       'Empower Your\nStudents\' Future',
                       style: TextStyle(
-                        fontSize: 32,
+                        fontSize: titleSize,
                         fontWeight: FontWeight.w900,
                         color: _textDark,
                         height: 1.15,
@@ -48,10 +50,10 @@ class OnboardingPage3 extends StatelessWidget {
 
                     const SizedBox(height: 14),
 
-                    const Text(
+                    Text(
                       'Monitor student internship progress, review submitted surveys, validate certificates, and ensure every student is career-ready.',
                       style: TextStyle(
-                        fontSize: 15,
+                        fontSize: bodySize,
                         color: _textBody,
                         height: 1.6,
                       ),
@@ -255,19 +257,21 @@ class _GetStartedButton extends StatelessWidget {
   const _GetStartedButton({required this.color, required this.onTap});
 
   @override
-  Widget build(BuildContext context) => Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(30),
-        child: Ink(
-          height: 50,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(30),
-            boxShadow: [BoxShadow(color: color.withOpacity(0.35), blurRadius: 20, offset: const Offset(0, 8))],
-          ),
+  Widget build(BuildContext context) => Container(
+        height: 50,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(30),
+          boxShadow: [BoxShadow(color: color.withOpacity(0.35), blurRadius: 20, offset: const Offset(0, 8))],
+        ),
+        child: Material(
+          color: color,
+          borderRadius: BorderRadius.circular(30),
+          clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: onTap,
             borderRadius: BorderRadius.circular(30),
+            splashColor: Colors.white.withOpacity(0.16),
+            highlightColor: Colors.white.withOpacity(0.08),
             child: const Padding(
               padding: EdgeInsets.symmetric(horizontal: 24),
               child: Center(

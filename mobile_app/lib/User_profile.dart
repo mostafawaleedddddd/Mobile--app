@@ -1,4 +1,5 @@
-import 'dart:io';
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
@@ -32,6 +33,27 @@ String _formatFullDate(String? raw) {
     return '${months[month - 1]} $year';
   } catch (_) {
     return raw;
+  }
+}
+
+String _buildCertificateImageValue({
+  required Uint8List bytes,
+  required String? mimeType,
+}) {
+  final safeMimeType = (mimeType == null || mimeType.isEmpty)
+      ? 'image/jpeg'
+      : mimeType;
+  return 'data:$safeMimeType;base64,${base64Encode(bytes)}';
+}
+
+Uint8List? _decodeCertificateImageValue(String? value) {
+  if (value == null || value.isEmpty || !value.startsWith('data:')) return null;
+  final commaIndex = value.indexOf(',');
+  if (commaIndex == -1 || commaIndex >= value.length - 1) return null;
+  try {
+    return base64Decode(value.substring(commaIndex + 1));
+  } catch (_) {
+    return null;
   }
 }
 
@@ -586,12 +608,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // ── Certificates ─────────────────────────────────────────────
 
-  void _addCertificate() {
-    final titleCtrl = TextEditingController();
-    final descCtrl  = TextEditingController();
-    String dateVal     = '';
-    File?  pickedImage;
-    bool   isUploading = false;
+  void _addCertificate() => _editCertificate();
+
+  void _editCertificate([Map<String, dynamic>? existing]) {
+    final titleCtrl = TextEditingController(text: (existing?['title'] ?? '').toString());
+    final descCtrl = TextEditingController(text: (existing?['description'] ?? '').toString());
+    String dateVal = (existing?['date'] ?? '').toString();
+    XFile? pickedImage;
+    Uint8List? pickedImageBytes;
+    bool isUploading = false;
+    final existingImageValue = (existing?['image_url'] ?? '').toString();
+    final existingImageBytes = _decodeCertificateImageValue(existingImageValue);
 
     final today     = DateTime.now();
     final yesterday = DateTime(today.year, today.month, today.day - 1);
@@ -602,7 +629,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, ss) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text('Add Certificate', style: TextStyle(fontWeight: FontWeight.w700)),
+          title: Text(
+            existing == null ? 'Add Certificate' : 'Edit Certificate',
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -629,26 +659,56 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   borderRadius: BorderRadius.circular(12),
                   onTap: () async {
                     final picked = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 80);
-                    if (picked != null) ss(() => pickedImage = File(picked.path));
+                    if (picked == null) return;
+                    final bytes = await picked.readAsBytes();
+                    ss(() {
+                      pickedImage = picked;
+                      pickedImageBytes = bytes;
+                    });
                   },
-                  child: Container(
-                    width: double.infinity,
-                    height: pickedImage != null ? 150 : 80,
-                    decoration: BoxDecoration(
-                      color: _blueLight,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: _blue.withOpacity(0.3)),
+                    child: Container(
+                      width: double.infinity,
+                      height: 96,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: _blueLight,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: _blue.withOpacity(0.3)),
+                      ),
+                      child: pickedImageBytes != null
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: Image.memory(pickedImageBytes!, fit: BoxFit.cover),
+                            )
+                          : existingImageValue.isNotEmpty
+                              ? ClipRRect(
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: existingImageBytes != null
+                                      ? Image.memory(existingImageBytes, fit: BoxFit.cover)
+                                      : Image.network(
+                                          existingImageValue,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (ctx, _, __) => const Center(
+                                            child: Icon(Icons.broken_image_outlined, color: _blue),
+                                          ),
+                                        ),
+                                )
+                              : const Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.upload_file_rounded, color: _blue, size: 28),
+                                    SizedBox(height: 6),
+                                    Text(
+                                      'Tap to pick image',
+                                      style: TextStyle(
+                                        color: _blue,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                     ),
-                    child: pickedImage != null
-                        ? ClipRRect(borderRadius: BorderRadius.circular(12),
-                            child: Image.file(pickedImage!, fit: BoxFit.cover))
-                        : const Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                            Icon(Icons.upload_file_rounded, color: _blue, size: 28),
-                            SizedBox(height: 6),
-                            Text('Tap to pick image',
-                                style: TextStyle(color: _blue, fontSize: 13, fontWeight: FontWeight.w600)),
-                          ]),
-                  ),
                 ),
                 if (isUploading) ...[
                   const SizedBox(height: 12),
@@ -664,25 +724,51 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: const Text('Cancel', style: TextStyle(color: _textGrey))),
             ElevatedButton(
               onPressed: isUploading ? null : () async {
-                Navigator.pop(ctx);
+                final title = titleCtrl.text.trim();
+                final description = descCtrl.text.trim();
+                if (title.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please enter a certificate title.')),
+                  );
+                  return;
+                }
+                if (dateVal.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please pick a certificate date.')),
+                  );
+                  return;
+                }
                 if (!await _confirmSave()) return;
                 ss(() => isUploading = true);
                 try {
                   String? imageUrl;
-                  if (pickedImage != null) {
-                    final fileName = 'cert_${widget.id}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-                    await _db.storage.from('Certificates').upload(fileName, pickedImage!);
-                    imageUrl = _db.storage.from('Certificates').getPublicUrl(fileName);
+                  if (pickedImage != null && pickedImageBytes != null) {
+                    imageUrl = _buildCertificateImageValue(
+                      bytes: pickedImageBytes!,
+                      mimeType: pickedImage!.mimeType,
+                    );
                   }
-                  await _db.from('Certificates').insert({
-                    'user_id': widget.id, 'title': titleCtrl.text.trim(),
-                    'description': descCtrl.text.trim(), 'date': dateVal, 'image_url': imageUrl,
-                  });
+                  final payload = {
+                    'user_id': widget.id,
+                    'title': title,
+                    'description': description,
+                    'date': dateVal,
+                    'image_url': imageUrl ?? existingImageValue,
+                  };
+                  if (existing == null) {
+                    await _db.from('Certificates').insert(payload);
+                  } else {
+                    await _db.from('Certificates').update(payload).eq('id', existing['id']);
+                  }
+                  if (!mounted) return;
+                  Navigator.pop(ctx);
                   _fetchAll();
                 } catch (e) {
                   if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
                 } finally {
-                  ss(() => isUploading = false);
+                  if (mounted) {
+                    ss(() => isUploading = false);
+                  }
                 }
               },
               style: ElevatedButton.styleFrom(backgroundColor: _blue, foregroundColor: _white,
@@ -690,6 +776,72 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: const Text('Save'),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _deleteCertificate(Map<String, dynamic> item) async {
+    if (!await _confirmDelete(item['title'] ?? 'this certificate')) return;
+    try {
+      await _db.from('Certificates').delete().eq('id', item['id']);
+      _fetchAll();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
+  void _showCertificateImage(Map<String, dynamic> item) {
+    final imageUrl = (item['image_url'] ?? '').toString();
+    if (imageUrl.isEmpty) return;
+    final imageBytes = _decodeCertificateImageValue(imageUrl);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        insetPadding: const EdgeInsets.all(20),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      (item['title'] ?? 'Certificate').toString(),
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: imageBytes != null
+                    ? Image.memory(imageBytes, fit: BoxFit.contain)
+                    : Image.network(
+                        imageUrl,
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, _, __) => Container(
+                          height: 220,
+                          color: _blueLight,
+                          child: const Center(
+                            child: Icon(Icons.broken_image_outlined, color: _blue, size: 36),
+                          ),
+                        ),
+                      ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1000,7 +1152,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           child: Text('No certificates yet.',
                               style: TextStyle(fontSize: 13, color: _textGrey.withOpacity(0.6))),
                         ),
-                      ..._certs.map((c) => _CertCard(data: c)),
+                      ..._certs.map((c) => _CertCard(
+                            data: c,
+                            onEdit: () => _editCertificate(c),
+                            onDelete: () => _deleteCertificate(c),
+                            onOpenImage: () => _showCertificateImage(c),
+                          )),
                       const SizedBox(height: 12),
                       Material(
                         color: Colors.transparent,
@@ -1123,43 +1280,126 @@ class _InternshipItem extends StatelessWidget {
 // ─── CERTIFICATE CARD ────────────────────
 class _CertCard extends StatelessWidget {
   final Map<String, dynamic> data;
-  const _CertCard({required this.data});
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+  final VoidCallback onOpenImage;
+  const _CertCard({
+    required this.data,
+    required this.onEdit,
+    required this.onDelete,
+    required this.onOpenImage,
+  });
 
   @override
   Widget build(BuildContext context) {
     final imageUrl = (data['image_url'] as String?) ?? '';
+    final imageBytes = _decodeCertificateImageValue(imageUrl);
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         if (imageUrl.isNotEmpty)
-          ClipRRect(borderRadius: BorderRadius.circular(10),
-              child: Image.network(imageUrl,
-                width: double.infinity, height: 160, fit: BoxFit.cover,
-                loadingBuilder: (ctx, child, prog) => prog == null
-                    ? child
-                    : Container(height: 160, color: _blueLight,
-                        child: const Center(child: CircularProgressIndicator(color: _blue))),
-                errorBuilder: (ctx, _, __) => Container(height: 100, color: _blueLight,
-                    child: const Center(child: Icon(Icons.broken_image_outlined, color: _blue))),
-              )),
-        const SizedBox(height: 8),
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Expanded(child: Text(data['title'] ?? '',
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _textDark))),
-          if ((data['date'] ?? '').isNotEmpty)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(color: _blueLight, borderRadius: BorderRadius.circular(20)),
-              child: Text(_formatFullDate(data['date']),
-                  style: const TextStyle(fontSize: 11, color: _blue, fontWeight: FontWeight.w600)),
+          InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: onOpenImage,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: imageBytes != null
+                  ? Image.memory(
+                      imageBytes,
+                      width: 92,
+                      height: 92,
+                      fit: BoxFit.cover,
+                      errorBuilder: (ctx, _, __) => Container(
+                        width: 92,
+                        height: 92,
+                        color: _blueLight,
+                        child: const Center(
+                          child: Icon(Icons.broken_image_outlined, color: _blue),
+                        ),
+                      ),
+                    )
+                  : Image.network(
+                      imageUrl,
+                      width: 92,
+                      height: 92,
+                      fit: BoxFit.cover,
+                      loadingBuilder: (ctx, child, prog) => prog == null
+                          ? child
+                          : Container(
+                              width: 92,
+                              height: 92,
+                              color: _blueLight,
+                              child: const Center(
+                                child: SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(color: _blue, strokeWidth: 2.4),
+                                ),
+                              ),
+                            ),
+                      errorBuilder: (ctx, _, __) => Container(
+                        width: 92,
+                        height: 92,
+                        color: _blueLight,
+                        child: const Center(
+                          child: Icon(Icons.broken_image_outlined, color: _blue),
+                        ),
+                      ),
+                    ),
             ),
-        ]),
-        if ((data['description'] ?? '').isNotEmpty) ...[
+          )
+        else
+          Container(
+            width: 92,
+            height: 92,
+            decoration: BoxDecoration(
+              color: _blueLight,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.image_outlined, color: _blue),
+          ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              Expanded(
+                child: Text(
+                  data['title'] ?? '',
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _textDark),
+                ),
+              ),
+              if ((data['date'] ?? '').isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(color: _blueLight, borderRadius: BorderRadius.circular(20)),
+                  child: Text(
+                    _formatFullDate(data['date']),
+                    style: const TextStyle(fontSize: 11, color: _blue, fontWeight: FontWeight.w600),
+                  ),
+                ),
+            ]),
+            if ((data['description'] ?? '').isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                data['description'],
+                style: const TextStyle(fontSize: 12, color: _textGrey, height: 1.4),
+              ),
+            ],
+            if (imageUrl.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              const Text(
+                'Tap image to view full certificate',
+                style: TextStyle(fontSize: 11, color: _textGrey),
+              ),
+            ],
+          ]),
+        ),
+        const SizedBox(width: 8),
+        Column(mainAxisSize: MainAxisSize.min, children: [
+          _RippleActionBtn(icon: Icons.edit_outlined, color: _blue, onTap: onEdit),
           const SizedBox(height: 4),
-          Text(data['description'], style: const TextStyle(fontSize: 13, color: _textGrey)),
-        ],
-        const SizedBox(height: 10),
-        const Divider(color: _border),
+          _RippleActionBtn(icon: Icons.delete_outline_rounded, color: Colors.red, onTap: onDelete),
+        ]),
       ]),
     );
   }

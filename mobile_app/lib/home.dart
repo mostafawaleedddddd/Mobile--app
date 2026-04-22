@@ -37,6 +37,8 @@ class OnboardingPage1 extends StatelessWidget {
   Widget build(BuildContext context) {
     final sh = MediaQuery.of(context).size.height;
     final sw = MediaQuery.of(context).size.width;
+    final titleSize = sw < 380 ? 28.0 : 32.0;
+    final bodySize = sw < 380 ? 14.0 : 15.0;
 
     return Scaffold(
       backgroundColor: _bg,
@@ -59,10 +61,10 @@ class OnboardingPage1 extends StatelessWidget {
                     const Spacer(),
 
                     // Title
-                    const Text(
+                    Text(
                       'Find Your Dream\nInternship',
                       style: TextStyle(
-                        fontSize: 32,
+                        fontSize: titleSize,
                         fontWeight: FontWeight.w900,
                         color: _textDark,
                         height: 1.15,
@@ -73,10 +75,10 @@ class OnboardingPage1 extends StatelessWidget {
                     const SizedBox(height: 14),
 
                     // Body
-                    const Text(
+                    Text(
                       'Browse hundreds of internship opportunities, apply with one tap, upload your CV, and track every application — all in one place.',
                       style: TextStyle(
-                        fontSize: 15,
+                        fontSize: bodySize,
                         color: _textBody,
                         height: 1.6,
                       ),
@@ -301,27 +303,31 @@ class _NextButton extends StatelessWidget {
   const _NextButton({required this.color, required this.onTap});
 
   @override
-  Widget build(BuildContext context) => Material(
-        color: Colors.transparent,
-        shape: const CircleBorder(),
-        child: Ink(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: color,
-            boxShadow: [
-              BoxShadow(
-                color: color.withOpacity(0.35),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
+  Widget build(BuildContext context) => Container(
+        width: 60,
+        height: 60,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: color.withOpacity(0.35),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Material(
+          color: color,
+          shape: const CircleBorder(),
+          clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: onTap,
             customBorder: const CircleBorder(),
-            child: const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 24),
+            splashColor: Colors.white.withOpacity(0.22),
+            highlightColor: Colors.white.withOpacity(0.10),
+            child: const Center(
+              child: Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 24),
+            ),
           ),
         ),
       );

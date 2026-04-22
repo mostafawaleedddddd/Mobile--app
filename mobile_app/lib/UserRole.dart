@@ -150,16 +150,16 @@ class _UserRoleState extends State<UserRole> with TickerProviderStateMixin {
           SafeArea(
             child: SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
               child: Column(
                 children: [
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 8),
                   _buildHeader(),
-                  const SizedBox(height: 44),
+                  const SizedBox(height: 24),
                   _buildCards(),
-                  const SizedBox(height: 36),
+                  const SizedBox(height: 20),
                   _buildContinueButton(),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 18),
                 ],
               ),
             ),
@@ -175,23 +175,23 @@ class _UserRoleState extends State<UserRole> with TickerProviderStateMixin {
       opacity: CurvedAnimation(parent: _entryCtrl, curve: Curves.easeOut),
       child: Column(children: [
         _FloatingLogo(pulseCtrl: _pulseCtrl, floatCtrl: _floatCtrl),
-        const SizedBox(height: 28),
+        const SizedBox(height: 18),
         const Text(
           'Choose Your Role',
           style: TextStyle(
-            fontSize: 30,
+            fontSize: 26,
             fontWeight: FontWeight.w800,
             letterSpacing: -0.8,
             color: _textDark,
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
         const Text(
           'Select how you\'ll be using the platform\nto personalise your experience',
           textAlign: TextAlign.center,
           style: TextStyle(
-            fontSize: 15,
-            height: 1.55,
+            fontSize: 14,
+            height: 1.45,
             color: _textGrey,
             fontWeight: FontWeight.w400,
           ),
@@ -216,7 +216,7 @@ class _UserRoleState extends State<UserRole> with TickerProviderStateMixin {
               curve: Interval(0.1 + i * 0.15, 1.0, curve: Curves.easeOut),
             ),
             child: Padding(
-              padding: const EdgeInsets.only(bottom: 14),
+              padding: const EdgeInsets.only(bottom: 12),
               child: _RoleCard(
                 role: _roles[i],
                 isSelected: _selected == i,
@@ -304,18 +304,18 @@ class _FloatingLogo extends StatelessWidget {
           offset: Offset(0, floatY),
           child: Stack(alignment: Alignment.center, children: [
             Container(
-              width: glowR * 2,
-              height: glowR * 2,
+              width: glowR * 1.75,
+              height: glowR * 1.75,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: _purple.withOpacity(glowOp),
               ),
             ),
             Container(
-              width: 76,
-              height: 76,
+              width: 64,
+              height: 64,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(22),
+                borderRadius: BorderRadius.circular(18),
                 gradient: const LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
@@ -330,7 +330,7 @@ class _FloatingLogo extends StatelessWidget {
                   ),
                 ],
               ),
-              child: const Icon(Icons.people_alt_rounded, color: _white, size: 36),
+              child: const Icon(Icons.people_alt_rounded, color: _white, size: 30),
             ),
           ]),
         );
