@@ -1,17 +1,17 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'Login_SignUp.dart'; // your existing AuthScreen lives here
-
+import 'company_auth.dart';
 // ─────────────────────────────────────────────
 // COLORS
 // ─────────────────────────────────────────────
-const _purple    = Color(0xFF6C63FF);
-const _teal      = Color(0xFF00C6A7);
-const _coral     = Color(0xFFFF6B6B);
-const _bgLight   = Color(0xFFF5F7FF);
-const _textDark  = Color(0xFF1A1A2E);
-const _textGrey  = Color(0xFF8A8FAE);
-const _white     = Colors.white;
+const _purple = Color(0xFF6C63FF);
+const _teal = Color(0xFF00C6A7);
+const _coral = Color(0xFFFF6B6B);
+const _bgLight = Color(0xFFF5F7FF);
+const _textDark = Color(0xFF1A1A2E);
+const _textGrey = Color(0xFF8A8FAE);
+const _white = Colors.white;
 
 // ─────────────────────────────────────────────
 // DATA MODEL
@@ -81,12 +81,18 @@ class _UserRoleState extends State<UserRole> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    _pulseCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 2200))
-      ..repeat(reverse: true);
-    _floatCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 3000))
-      ..repeat(reverse: true);
-    _entryCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 900))
-      ..forward();
+    _pulseCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2200),
+    )..repeat(reverse: true);
+    _floatCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 3000),
+    )..repeat(reverse: true);
+    _entryCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..forward();
   }
 
   @override
@@ -108,11 +114,26 @@ class _UserRoleState extends State<UserRole> with TickerProviderStateMixin {
           transitionsBuilder: (_, anim, __, child) => FadeTransition(
             opacity: anim,
             child: SlideTransition(
-              position: Tween<Offset>(begin: const Offset(0.06, 0), end: Offset.zero)
-                  .animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)),
+              position:
+                  Tween<Offset>(
+                    begin: const Offset(0.06, 0),
+                    end: Offset.zero,
+                  ).animate(
+                    CurvedAnimation(parent: anim, curve: Curves.easeOutCubic),
+                  ),
               child: child,
             ),
           ),
+          transitionDuration: const Duration(milliseconds: 420),
+        ),
+      );
+    } else if (_selected == 1) {
+      Navigator.push(
+        context,
+        PageRouteBuilder(
+          pageBuilder: (_, a, __) => const CompanyAuthScreen(),
+          transitionsBuilder: (_, anim, __, child) =>
+              FadeTransition(opacity: anim, child: child),
           transitionDuration: const Duration(milliseconds: 420),
         ),
       );
@@ -126,7 +147,9 @@ class _UserRoleState extends State<UserRole> with TickerProviderStateMixin {
           ),
           behavior: SnackBarBehavior.floating,
           backgroundColor: _roles[_selected!].accentColor,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           margin: const EdgeInsets.all(16),
         ),
       );
@@ -140,12 +163,27 @@ class _UserRoleState extends State<UserRole> with TickerProviderStateMixin {
       body: Stack(
         children: [
           // decorative blobs
-          _AnimatedBlob(ctrl: _pulseCtrl, top: -80, left: -60,
-              size: 260, color: _purple.withOpacity(0.07)),
-          _AnimatedBlob(ctrl: _pulseCtrl, bottom: -60, right: -40,
-              size: 200, color: _teal.withOpacity(0.06)),
-          _AnimatedBlob(ctrl: _floatCtrl, top: 200, right: -30,
-              size: 140, color: _coral.withOpacity(0.05)),
+          _AnimatedBlob(
+            ctrl: _pulseCtrl,
+            top: -80,
+            left: -60,
+            size: 260,
+            color: _purple.withOpacity(0.07),
+          ),
+          _AnimatedBlob(
+            ctrl: _pulseCtrl,
+            bottom: -60,
+            right: -40,
+            size: 200,
+            color: _teal.withOpacity(0.06),
+          ),
+          _AnimatedBlob(
+            ctrl: _floatCtrl,
+            top: 200,
+            right: -30,
+            size: 140,
+            color: _coral.withOpacity(0.05),
+          ),
 
           SafeArea(
             child: SingleChildScrollView(
@@ -173,30 +211,32 @@ class _UserRoleState extends State<UserRole> with TickerProviderStateMixin {
   Widget _buildHeader() {
     return FadeTransition(
       opacity: CurvedAnimation(parent: _entryCtrl, curve: Curves.easeOut),
-      child: Column(children: [
-        _FloatingLogo(pulseCtrl: _pulseCtrl, floatCtrl: _floatCtrl),
-        const SizedBox(height: 28),
-        const Text(
-          'Choose Your Role',
-          style: TextStyle(
-            fontSize: 30,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -0.8,
-            color: _textDark,
+      child: Column(
+        children: [
+          _FloatingLogo(pulseCtrl: _pulseCtrl, floatCtrl: _floatCtrl),
+          const SizedBox(height: 28),
+          const Text(
+            'Choose Your Role',
+            style: TextStyle(
+              fontSize: 30,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.8,
+              color: _textDark,
+            ),
           ),
-        ),
-        const SizedBox(height: 10),
-        const Text(
-          'Select how you\'ll be using the platform\nto personalise your experience',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 15,
-            height: 1.55,
-            color: _textGrey,
-            fontWeight: FontWeight.w400,
+          const SizedBox(height: 10),
+          const Text(
+            'Select how you\'ll be using the platform\nto personalise your experience',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 15,
+              height: 1.55,
+              color: _textGrey,
+              fontWeight: FontWeight.w400,
+            ),
           ),
-        ),
-      ]),
+        ],
+      ),
     );
   }
 
@@ -205,11 +245,20 @@ class _UserRoleState extends State<UserRole> with TickerProviderStateMixin {
     return Column(
       children: List.generate(_roles.length, (i) {
         return SlideTransition(
-          position: Tween<Offset>(begin: Offset(0, 0.25 + i * 0.08), end: Offset.zero)
-              .animate(CurvedAnimation(
-                parent: _entryCtrl,
-                curve: Interval(0.1 + i * 0.15, 0.8 + i * 0.06, curve: Curves.easeOutCubic),
-              )),
+          position:
+              Tween<Offset>(
+                begin: Offset(0, 0.25 + i * 0.08),
+                end: Offset.zero,
+              ).animate(
+                CurvedAnimation(
+                  parent: _entryCtrl,
+                  curve: Interval(
+                    0.1 + i * 0.15,
+                    0.8 + i * 0.06,
+                    curve: Curves.easeOutCubic,
+                  ),
+                ),
+              ),
           child: FadeTransition(
             opacity: CurvedAnimation(
               parent: _entryCtrl,
@@ -233,7 +282,7 @@ class _UserRoleState extends State<UserRole> with TickerProviderStateMixin {
   // ── CONTINUE BUTTON ─────────────────────────
   Widget _buildContinueButton() {
     final enabled = _selected != null;
-    final accent  = enabled ? _roles[_selected!].accentColor : _purple;
+    final accent = enabled ? _roles[_selected!].accentColor : _purple;
 
     return AnimatedOpacity(
       duration: const Duration(milliseconds: 300),
@@ -271,8 +320,12 @@ class _UserRoleState extends State<UserRole> with TickerProviderStateMixin {
             children: [
               Text(
                 'Continue',
-                style: TextStyle(color: _white, fontSize: 17,
-                    fontWeight: FontWeight.w700, letterSpacing: 0.3),
+                style: TextStyle(
+                  color: _white,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.3,
+                ),
               ),
               SizedBox(width: 10),
               Icon(Icons.arrow_forward_rounded, color: _white, size: 20),
@@ -298,41 +351,48 @@ class _FloatingLogo extends StatelessWidget {
       animation: Listenable.merge([pulseCtrl, floatCtrl]),
       builder: (_, __) {
         final floatY = math.sin(floatCtrl.value * math.pi) * 6.0;
-        final glowR  = 42.0 + pulseCtrl.value * 8;
+        final glowR = 42.0 + pulseCtrl.value * 8;
         final glowOp = 0.13 + pulseCtrl.value * 0.12;
         return Transform.translate(
           offset: Offset(0, floatY),
-          child: Stack(alignment: Alignment.center, children: [
-            Container(
-              width: glowR * 2,
-              height: glowR * 2,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: _purple.withOpacity(glowOp),
-              ),
-            ),
-            Container(
-              width: 76,
-              height: 76,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(22),
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(0xFF6C63FF), Color(0xFF5144D3)],
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Container(
+                width: glowR * 2,
+                height: glowR * 2,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _purple.withOpacity(glowOp),
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: _purple.withOpacity(0.40 + pulseCtrl.value * 0.1),
-                    blurRadius: 22,
-                    spreadRadius: 2,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
               ),
-              child: const Icon(Icons.people_alt_rounded, color: _white, size: 36),
-            ),
-          ]),
+              Container(
+                width: 76,
+                height: 76,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(22),
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF6C63FF), Color(0xFF5144D3)],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _purple.withOpacity(0.40 + pulseCtrl.value * 0.1),
+                      blurRadius: 22,
+                      spreadRadius: 2,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.people_alt_rounded,
+                  color: _white,
+                  size: 36,
+                ),
+              ),
+            ],
+          ),
         );
       },
     );
@@ -364,13 +424,17 @@ class _AnimatedBlob extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Positioned(
-      top: top, bottom: bottom, left: left, right: right,
+      top: top,
+      bottom: bottom,
+      left: left,
+      right: right,
       child: AnimatedBuilder(
         animation: ctrl,
         builder: (_, __) => Transform.scale(
           scale: 1.0 + ctrl.value * 0.12,
           child: Container(
-            width: size, height: size,
+            width: size,
+            height: size,
             decoration: BoxDecoration(shape: BoxShape.circle, color: color),
           ),
         ),
@@ -399,16 +463,22 @@ class _RoleCard extends StatefulWidget {
   State<_RoleCard> createState() => _RoleCardState();
 }
 
-class _RoleCardState extends State<_RoleCard> with SingleTickerProviderStateMixin {
+class _RoleCardState extends State<_RoleCard>
+    with SingleTickerProviderStateMixin {
   late AnimationController _pressCtrl;
   late Animation<double> _scaleAnim;
 
   @override
   void initState() {
     super.initState();
-    _pressCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 110));
-    _scaleAnim = Tween<double>(begin: 1.0, end: 0.965)
-        .animate(CurvedAnimation(parent: _pressCtrl, curve: Curves.easeOut));
+    _pressCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 110),
+    );
+    _scaleAnim = Tween<double>(
+      begin: 1.0,
+      end: 0.965,
+    ).animate(CurvedAnimation(parent: _pressCtrl, curve: Curves.easeOut));
   }
 
   @override
@@ -421,7 +491,10 @@ class _RoleCardState extends State<_RoleCard> with SingleTickerProviderStateMixi
   Widget build(BuildContext context) {
     return GestureDetector(
       onTapDown: (_) => _pressCtrl.forward(),
-      onTapUp: (_) { _pressCtrl.reverse(); widget.onTap(); },
+      onTapUp: (_) {
+        _pressCtrl.reverse();
+        widget.onTap();
+      },
       onTapCancel: () => _pressCtrl.reverse(),
       child: AnimatedBuilder(
         animation: Listenable.merge([_scaleAnim, widget.pulseCtrl]),
@@ -453,8 +526,11 @@ class _RoleCardState extends State<_RoleCard> with SingleTickerProviderStateMixi
                     offset: const Offset(0, 6),
                   ),
                   if (!widget.isSelected)
-                    BoxShadow(color: Colors.black.withOpacity(0.035),
-                        blurRadius: 8, offset: const Offset(0, 2)),
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.035),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
                 ],
               ),
               child: child,
@@ -463,12 +539,14 @@ class _RoleCardState extends State<_RoleCard> with SingleTickerProviderStateMixi
         },
         child: Padding(
           padding: const EdgeInsets.all(20),
-          child: Row(children: [
-            _buildIcon(),
-            const SizedBox(width: 16),
-            Expanded(child: _buildText()),
-            _buildCheck(),
-          ]),
+          child: Row(
+            children: [
+              _buildIcon(),
+              const SizedBox(width: 16),
+              Expanded(child: _buildText()),
+              _buildCheck(),
+            ],
+          ),
         ),
       ),
     );
@@ -477,59 +555,89 @@ class _RoleCardState extends State<_RoleCard> with SingleTickerProviderStateMixi
   Widget _buildIcon() {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 280),
-      width: 58, height: 58,
+      width: 58,
+      height: 58,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         gradient: widget.isSelected
             ? LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: widget.role.gradient)
+                colors: widget.role.gradient,
+              )
             : null,
-        color: widget.isSelected ? null : widget.role.accentColor.withOpacity(0.09),
+        color: widget.isSelected
+            ? null
+            : widget.role.accentColor.withOpacity(0.09),
         boxShadow: widget.isSelected
-            ? [BoxShadow(color: widget.role.accentColor.withOpacity(0.33),
-                blurRadius: 16, offset: const Offset(0, 4))]
+            ? [
+                BoxShadow(
+                  color: widget.role.accentColor.withOpacity(0.33),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ]
             : null,
       ),
-      child: Icon(widget.role.icon, size: 26,
-          color: widget.isSelected ? _white : widget.role.accentColor),
+      child: Icon(
+        widget.role.icon,
+        size: 26,
+        color: widget.isSelected ? _white : widget.role.accentColor,
+      ),
     );
   }
 
   Widget _buildText() {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      AnimatedDefaultTextStyle(
-        duration: const Duration(milliseconds: 200),
-        style: TextStyle(
-          fontSize: 15.5,
-          fontWeight: FontWeight.w700,
-          letterSpacing: -0.2,
-          color: widget.isSelected ? widget.role.accentColor : _textDark,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AnimatedDefaultTextStyle(
+          duration: const Duration(milliseconds: 200),
+          style: TextStyle(
+            fontSize: 15.5,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.2,
+            color: widget.isSelected ? widget.role.accentColor : _textDark,
+          ),
+          child: Text(widget.role.title),
         ),
-        child: Text(widget.role.title),
-      ),
-      const SizedBox(height: 5),
-      Text(widget.role.subtitle,
-          style: const TextStyle(fontSize: 12.5, height: 1.45, color: _textGrey)),
-    ]);
+        const SizedBox(height: 5),
+        Text(
+          widget.role.subtitle,
+          style: const TextStyle(
+            fontSize: 12.5,
+            height: 1.45,
+            color: _textGrey,
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildCheck() {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 240),
-      width: 22, height: 22,
+      width: 22,
+      height: 22,
       margin: const EdgeInsets.only(left: 10),
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: widget.isSelected
-            ? LinearGradient(colors: widget.role.gradient,
-                begin: Alignment.topLeft, end: Alignment.bottomRight)
+            ? LinearGradient(
+                colors: widget.role.gradient,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
             : null,
         color: widget.isSelected ? null : const Color(0xFFEEF0FA),
         boxShadow: widget.isSelected
-            ? [BoxShadow(color: widget.role.accentColor.withOpacity(0.38),
-                blurRadius: 8, offset: const Offset(0, 2))]
+            ? [
+                BoxShadow(
+                  color: widget.role.accentColor.withOpacity(0.38),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ]
             : null,
       ),
       child: widget.isSelected
