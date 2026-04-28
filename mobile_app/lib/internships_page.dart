@@ -1,0 +1,782 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// internships_page.dart
+// Student-facing browse page for company-posted job/internship opportunities.
+// Students can read details and apply. Applied count on ProfileScreen updates
+// dynamically because ProfileScreen re-fetches when this page is popped.
+// ─────────────────────────────────────────────────────────────────────────────
+
+import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+// ─── COLORS (match User_profile.dart palette) ────────────────────────────────
+const _blue      = Color(0xFF3B82F6);
+const _blueLight = Color(0xFFEFF6FF);
+const _bluePale  = Color(0xFFF0F7FF);
+const _textDark  = Color(0xFF1E293B);
+const _textGrey  = Color(0xFF64748B);
+const _border    = Color(0xFFE2E8F0);
+const _white     = Colors.white;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INTERNSHIPS PAGE
+// ─────────────────────────────────────────────────────────────────────────────
+class InternshipsPage extends StatefulWidget {
+  final int    userId;
+  final String userName;
+  final String userEmail;
+
+  const InternshipsPage({
+    super.key,
+    required this.userId,
+    required this.userName,
+    required this.userEmail,
+  });
+
+  @override
+  State<InternshipsPage> createState() => _InternshipsPageState();
+}
+
+class _InternshipsPageState extends State<InternshipsPage> {
+  final _db = Supabase.instance.client;
+
+  bool _isLoading = true;
+  List<Map<String, dynamic>> _allJobs      = [];
+  List<Map<String, dynamic>> _filtered     = [];
+  Set<int>                   _appliedIds   = {};    // job_posting ids already applied to
+  final _searchCtrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+    _searchCtrl.addListener(_applyFilter);
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  // ─── DATA ────────────────────────────────────────────────────────────────
+
+  Future<void> _loadData() async {
+    setState(() => _isLoading = true);
+    try {
+      // Fetch all job postings joined with company name
+      final jobs = await _db
+          .from('Job_postings')
+          .select('*, Company_profile(name, industry, location)')
+          .order('created_at', ascending: false);
+
+      // Fetch which jobs this student has already applied to
+      final applied = await _db
+          .from('Job_applications')
+          .select('job_id')
+          .eq('student_id', widget.userId);
+
+      if (mounted) {
+        setState(() {
+          _allJobs    = List<Map<String, dynamic>>.from(jobs as List);
+          _filtered   = List.from(_allJobs);
+          _appliedIds = {
+            for (final a in (applied as List)) (a['job_id'] as int),
+          };
+          _isLoading  = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error loading jobs: $e')));
+      }
+    }
+  }
+
+  void _applyFilter() {
+    final q = _searchCtrl.text.trim().toLowerCase();
+    setState(() {
+      _filtered = q.isEmpty
+          ? List.from(_allJobs)
+          : _allJobs.where((j) {
+              final title   = (j['title'] ?? '').toString().toLowerCase();
+              final company = (j['Company_profile']?['name'] ?? '').toString().toLowerCase();
+              final loc     = (j['location'] ?? '').toString().toLowerCase();
+              return title.contains(q) || company.contains(q) || loc.contains(q);
+            }).toList();
+    });
+  }
+
+  // ─── APPLY ───────────────────────────────────────────────────────────────
+
+  Future<void> _applyToJob(Map<String, dynamic> job) async {
+    final jobId = job['id'] as int;
+    try {
+      await _db.from('Job_applications').insert({
+        'job_id':        jobId,
+        'student_id':    widget.userId,
+        'student_name':  widget.userName,
+        'student_email': widget.userEmail,
+        'status':        'pending',
+      });
+      setState(() => _appliedIds.add(jobId));
+      if (mounted) {
+        Navigator.pop(context); // close detail sheet
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '🎉 Applied to ${job['title']}!',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            backgroundColor: _blue,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12)),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
+  // ─── DETAIL SHEET ────────────────────────────────────────────────────────
+
+  void _showDetail(Map<String, dynamic> job) {
+    final jobId      = job['id'] as int;
+    final isApplied  = _appliedIds.contains(jobId);
+    final company    = job['Company_profile']?['name'] ?? '—';
+    final industry   = job['Company_profile']?['industry'] ?? '';
+    final title      = job['title'] ?? '';
+    final desc       = job['description'] ?? '';
+    final req        = job['requirements'] ?? '';
+    final loc        = job['location'] ?? '';
+    final duration   = job['duration'] ?? '';
+    final spots      = job['spots_available'] ?? 0;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.75,
+        maxChildSize: 0.95,
+        minChildSize: 0.45,
+        builder: (_, scrollCtrl) => Container(
+          decoration: const BoxDecoration(
+            color: _white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            children: [
+              // Handle
+              Padding(
+                padding: const EdgeInsets.only(top: 12, bottom: 4),
+                child: Container(
+                  width: 40, height: 4,
+                  decoration: BoxDecoration(
+                    color: _border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: scrollCtrl,
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // ── Company avatar + title ──
+                      Row(
+                        children: [
+                          Container(
+                            width: 52, height: 52,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF60A5FA), _blue],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Center(
+                              child: Text(
+                                company.isNotEmpty
+                                    ? company[0].toUpperCase()
+                                    : 'C',
+                                style: const TextStyle(
+                                    color: _white,
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w800),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(company,
+                                    style: const TextStyle(
+                                        fontSize: 17,
+                                        fontWeight: FontWeight.w800,
+                                        color: _textDark)),
+                                if (industry.isNotEmpty)
+                                  Text(industry,
+                                      style: const TextStyle(
+                                          fontSize: 13, color: _textGrey)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // ── Title ──
+                      Text(title,
+                          style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w900,
+                              color: _textDark,
+                              letterSpacing: -0.4)),
+
+                      const SizedBox(height: 12),
+
+                      // ── Tags ──
+                      Wrap(
+                        spacing: 8, runSpacing: 8,
+                        children: [
+                          _Tag(icon: Icons.location_on_outlined, label: loc),
+                          _Tag(icon: Icons.schedule_outlined,    label: duration),
+                          _Tag(icon: Icons.group_outlined,
+                              label: '$spots spot${spots == 1 ? '' : 's'}'),
+                        ],
+                      ),
+
+                      const SizedBox(height: 22),
+
+                      // ── Description ──
+                      _DetailSection(
+                        icon: Icons.description_outlined,
+                        title: 'Description',
+                        content: desc,
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // ── Requirements ──
+                      _DetailSection(
+                        icon: Icons.checklist_rounded,
+                        title: 'Requirements',
+                        content: req,
+                      ),
+
+                      const SizedBox(height: 28),
+
+                      // ── Apply button ──
+                      SizedBox(
+                        width: double.infinity,
+                        height: 54,
+                        child: isApplied
+                            ? Container(
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF10B981).withOpacity(0.10),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                      color: const Color(0xFF10B981), width: 1.4),
+                                ),
+                                child: const Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.check_circle_rounded,
+                                        color: Color(0xFF10B981), size: 20),
+                                    SizedBox(width: 8),
+                                    Text('Already Applied',
+                                        style: TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w700,
+                                            color: Color(0xFF10B981))),
+                                  ],
+                                ),
+                              )
+                            : ElevatedButton.icon(
+                                onPressed: () => _applyToJob(job),
+                                icon: const Icon(Icons.send_rounded,
+                                    size: 18, color: _white),
+                                label: const Text('Apply Now',
+                                    style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700,
+                                        color: _white)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: _blue,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14)),
+                                ),
+                              ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ─── BUILD ───────────────────────────────────────────────────────────────
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: _bluePale,
+      body: Stack(
+        children: [
+          // Background blobs
+          Positioned(
+            top: -80, left: -60,
+            child: _Blob(
+                size: MediaQuery.of(context).size.width * 0.7,
+                color: _blue.withOpacity(0.07)),
+          ),
+          Positioned(
+            bottom: -60, right: -40,
+            child: _Blob(
+                size: MediaQuery.of(context).size.width * 0.55,
+                color: _blue.withOpacity(0.05)),
+          ),
+
+          SafeArea(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── App bar ──
+                Padding(
+                  padding:
+                      const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                  child: Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: Container(
+                          width: 40, height: 40,
+                          decoration: BoxDecoration(
+                            color: _white,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                  color: _blue.withOpacity(0.08),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 3))
+                            ],
+                          ),
+                          child: const Icon(Icons.arrow_back_ios_new_rounded,
+                              color: _textDark, size: 16),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Internships',
+                                style: TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w800,
+                                    color: _textDark,
+                                    letterSpacing: -0.3)),
+                            Text('Browse & apply to opportunities',
+                                style: TextStyle(
+                                    fontSize: 12, color: _textGrey)),
+                          ],
+                        ),
+                      ),
+                      // Refresh
+                      GestureDetector(
+                        onTap: _loadData,
+                        child: Container(
+                          width: 40, height: 40,
+                          decoration: BoxDecoration(
+                            color: _white,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                  color: _blue.withOpacity(0.08),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 3))
+                            ],
+                          ),
+                          child: const Icon(Icons.refresh_rounded,
+                              color: _textGrey, size: 20),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // ── Search bar ──
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: _white,
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                            color: _blue.withOpacity(0.07),
+                            blurRadius: 14,
+                            offset: const Offset(0, 4))
+                      ],
+                    ),
+                    child: TextField(
+                      controller: _searchCtrl,
+                      style: const TextStyle(fontSize: 14, color: _textDark),
+                      decoration: InputDecoration(
+                        hintText: 'Search by title, company, location...',
+                        hintStyle: const TextStyle(
+                            color: Color(0xFFADB5BD), fontSize: 13),
+                        prefixIcon: const Icon(Icons.search_rounded,
+                            color: Color(0xFF94A3B8), size: 20),
+                        suffixIcon: _searchCtrl.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.close_rounded,
+                                    size: 18, color: Color(0xFF94A3B8)),
+                                onPressed: () {
+                                  _searchCtrl.clear();
+                                },
+                              )
+                            : null,
+                        filled: true,
+                        fillColor: _white,
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 14),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide.none),
+                        enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide.none),
+                        focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(
+                                color: _blue, width: 1.5)),
+                      ),
+                    ),
+                  ),
+                ),
+
+                // ── Count label ──
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 6),
+                  child: Text(
+                    _isLoading
+                        ? 'Loading...'
+                        : '${_filtered.length} opportunit${_filtered.length == 1 ? 'y' : 'ies'} found',
+                    style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: _textGrey),
+                  ),
+                ),
+
+                // ── List ──
+                Expanded(
+                  child: _isLoading
+                      ? const Center(
+                          child: CircularProgressIndicator(color: _blue))
+                      : _filtered.isEmpty
+                          ? _EmptyState(
+                              query: _searchCtrl.text.trim())
+                          : RefreshIndicator(
+                              color: _blue,
+                              onRefresh: _loadData,
+                              child: ListView.builder(
+                                padding: const EdgeInsets.fromLTRB(
+                                    20, 4, 20, 32),
+                                itemCount: _filtered.length,
+                                itemBuilder: (_, i) => _JobCard(
+                                  job:       _filtered[i],
+                                  isApplied: _appliedIds
+                                      .contains(_filtered[i]['id'] as int),
+                                  onTap:     () => _showDetail(_filtered[i]),
+                                ),
+                              ),
+                            ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// JOB CARD
+// ─────────────────────────────────────────────────────────────────────────────
+class _JobCard extends StatelessWidget {
+  final Map<String, dynamic> job;
+  final bool isApplied;
+  final VoidCallback onTap;
+  const _JobCard(
+      {required this.job,
+      required this.isApplied,
+      required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final company  = job['Company_profile']?['name'] ?? '—';
+    final title    = job['title'] ?? '';
+    final loc      = job['location'] ?? '';
+    final duration = job['duration'] ?? '';
+    final initial  = company.isNotEmpty ? company[0].toUpperCase() : 'C';
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: _white,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+                color: _blue.withOpacity(0.07),
+                blurRadius: 16,
+                offset: const Offset(0, 5))
+          ],
+        ),
+        child: Row(
+          children: [
+            // ── Avatar ──
+            Container(
+              width: 48, height: 48,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                    colors: [Color(0xFF60A5FA), _blue],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Center(
+                child: Text(initial,
+                    style: const TextStyle(
+                        color: _white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800)),
+              ),
+            ),
+
+            const SizedBox(width: 14),
+
+            // ── Info ──
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: _textDark),
+                      overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 3),
+                  Text(company,
+                      style: const TextStyle(
+                          fontSize: 13, color: _textGrey),
+                      overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 7),
+                  Row(
+                    children: [
+                      _MiniTag(Icons.location_on_outlined, loc),
+                      const SizedBox(width: 6),
+                      _MiniTag(Icons.schedule_outlined, duration),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(width: 8),
+
+            // ── Applied badge ──
+            if (isApplied)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981).withOpacity(0.10),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                      color: const Color(0xFF10B981), width: 1.0),
+                ),
+                child: const Text('Applied',
+                    style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF10B981))),
+              )
+            else
+              const Icon(Icons.chevron_right_rounded,
+                  color: _textGrey, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+class _MiniTag extends StatelessWidget {
+  final IconData icon;
+  final String   label;
+  const _MiniTag(this.icon, this.label);
+
+  @override
+  Widget build(BuildContext context) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 11, color: _textGrey),
+          const SizedBox(width: 3),
+          Text(label,
+              style: const TextStyle(fontSize: 11, color: _textGrey),
+              overflow: TextOverflow.ellipsis),
+        ],
+      );
+}
+
+class _Tag extends StatelessWidget {
+  final IconData icon;
+  final String   label;
+  const _Tag({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: _blueLight,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: _blue.withOpacity(0.2)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 12, color: _blue),
+            const SizedBox(width: 5),
+            Text(label,
+                style: const TextStyle(
+                    fontSize: 12,
+                    color: _blue,
+                    fontWeight: FontWeight.w600)),
+          ],
+        ),
+      );
+}
+
+class _DetailSection extends StatelessWidget {
+  final IconData icon;
+  final String   title;
+  final String   content;
+  const _DetailSection(
+      {required this.icon,
+      required this.title,
+      required this.content});
+
+  @override
+  Widget build(BuildContext context) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 30, height: 30,
+                decoration: BoxDecoration(
+                    color: _blueLight,
+                    borderRadius: BorderRadius.circular(9)),
+                child: Icon(icon, size: 15, color: _blue),
+              ),
+              const SizedBox(width: 10),
+              Text(title,
+                  style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: _textDark)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: _bluePale,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: _border),
+            ),
+            child: Text(
+              content.isNotEmpty ? content : '—',
+              style: const TextStyle(
+                  fontSize: 13.5, color: _textGrey, height: 1.6),
+            ),
+          ),
+        ],
+      );
+}
+
+class _EmptyState extends StatelessWidget {
+  final String query;
+  const _EmptyState({required this.query});
+
+  @override
+  Widget build(BuildContext context) => Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 72, height: 72,
+              decoration: BoxDecoration(
+                  color: _blueLight,
+                  borderRadius: BorderRadius.circular(22)),
+              child: const Icon(Icons.work_off_outlined,
+                  color: _blue, size: 34),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              query.isEmpty
+                  ? 'No internships posted yet.'
+                  : 'No results for "$query".',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                  fontSize: 15,
+                  color: _textGrey,
+                  height: 1.6,
+                  fontWeight: FontWeight.w500),
+            ),
+          ],
+        ),
+      );
+}
+
+class _Blob extends StatelessWidget {
+  final double size;
+  final Color  color;
+  const _Blob({required this.size, required this.color});
+  @override
+  Widget build(BuildContext context) => Container(
+        width: size, height: size,
+        decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+      );
+}

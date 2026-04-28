@@ -39,10 +39,17 @@ class _SurveyScreenState extends State<SurveyScreen>
 
   // ── state ──────────────────────────────────
   Map<String, dynamic>? _selectedInternship;
-  bool _alreadySubmitted = false;
+  bool _alreadySubmitted    = false;
   bool _isCheckingDuplicate = false;
-  bool _isSubmitting = false;
-  bool _submitted    = false;
+  bool _isSubmitting        = false;
+  bool _submitted           = false;
+
+  // ── picker state ───────────────────────────
+  final _searchCtrl          = TextEditingController();
+  List<_SurveyOption> _allOptions      = [];
+  List<_SurveyOption> _filteredOptions = [];
+  bool _searchLoading = false;
+  bool _dropdownOpen  = false;
 
   // Section A: General Experience
   int  _overallRating    = 0;
@@ -56,7 +63,6 @@ class _SurveyScreenState extends State<SurveyScreen>
   // Section C: Tasks & Feedback
   bool   _tasksAligned      = true;
   final _improvementCtrl    = TextEditingController();
-  final TextEditingController _companyController = TextEditingController();
   // Section D: Open Feedback
   final _bestPartCtrl       = TextEditingController();
   final _biggestChalCtrl    = TextEditingController();
@@ -64,14 +70,15 @@ class _SurveyScreenState extends State<SurveyScreen>
   late AnimationController _successCtrl;
   late Animation<double>   _successAnim;
 
-
-
   @override
   void initState() {
     super.initState();
     _successCtrl = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 700));
-    _successAnim = CurvedAnimation(parent: _successCtrl, curve: Curves.elasticOut);
+    _successAnim =
+        CurvedAnimation(parent: _successCtrl, curve: Curves.elasticOut);
+    _searchCtrl.addListener(_onSearchChanged);
+    _buildOptions();
   }
 
   @override
@@ -79,11 +86,112 @@ class _SurveyScreenState extends State<SurveyScreen>
     _improvementCtrl.dispose();
     _bestPartCtrl.dispose();
     _biggestChalCtrl.dispose();
+    _searchCtrl.dispose();
     _successCtrl.dispose();
     super.dispose();
   }
 
-  
+  // ── options builder ─────────────────────────
+  Future<void> _buildOptions() async {
+    setState(() => _searchLoading = true);
+    final List<_SurveyOption> opts = [];
+
+    // 1. Manual internships already on profile
+    for (final i in widget.internships) {
+      opts.add(_SurveyOption(
+        id:      i['id'] as int,
+        company: i['company'] ?? '',
+        role:    i['department'] ?? '',
+        source:  'manual',
+        raw:     i,
+      ));
+    }
+
+    // 2. Job applications from DB (applied through InternshipsPage)
+    try {
+      final apps = await _db
+          .from('Job_applications')
+          .select('id, job_id, Job_postings(id, title, Company_profile(name))')
+          .eq('student_id', widget.userId);
+      for (final a in (apps as List)) {
+        final posting = a['Job_postings'];
+        if (posting == null) continue;
+        final company = posting['Company_profile']?['name'] ?? '';
+        final jobId   = posting['id'] as int;
+        // avoid duplicate if same job already listed
+        if (opts.any((o) => o.source == 'applied' && o.id == jobId)) continue;
+        opts.add(_SurveyOption(
+          id:      jobId,
+          company: company,
+          role:    posting['title'] ?? '',
+          source:  'applied',
+          raw:     {'id': jobId, 'company': company},
+        ));
+      }
+    } catch (_) {}
+
+    // 3. All companies from DB (so user can select even without a prior application)
+    try {
+      final companies = await _db
+          .from('Company_profile')
+          .select('id, name, industry');
+      for (final c in (companies as List)) {
+        final name = c['name'] ?? '';
+        if (opts.any((o) => o.company.toLowerCase() == name.toLowerCase())) continue;
+        opts.add(_SurveyOption(
+          id:      c['id'] as int,
+          company: name,
+          role:    c['industry'] ?? '',
+          source:  'company',
+          raw:     {'id': c['id'], 'company': name},
+        ));
+      }
+    } catch (_) {}
+
+    if (mounted) {
+      setState(() {
+        _allOptions      = opts;
+        _filteredOptions = List.from(opts);
+        _searchLoading   = false;
+      });
+    }
+  }
+
+  void _onSearchChanged() {
+    final q = _searchCtrl.text.trim().toLowerCase();
+    setState(() {
+      _dropdownOpen    = q.isNotEmpty;
+      _filteredOptions = q.isEmpty
+          ? List.from(_allOptions)
+          : _allOptions.where((o) {
+              return o.company.toLowerCase().contains(q) ||
+                  o.role.toLowerCase().contains(q);
+            }).toList();
+    });
+  }
+
+  void _selectOption(_SurveyOption opt) async {
+    setState(() {
+      _selectedInternship = opt.raw;
+      _searchCtrl.text    = opt.company + (opt.role.isNotEmpty ? ' — ${opt.role}' : '');
+      _dropdownOpen       = false;
+    });
+    FocusScope.of(context).unfocus();
+
+    // Check for duplicate survey
+    setState(() => _isCheckingDuplicate = true);
+    try {
+      final existing = await _db
+          .from('Survey')
+          .select('id')
+          .eq('user_id', widget.userId)
+          .eq('internship_id', opt.id)
+          .maybeSingle();
+      if (mounted) setState(() { _alreadySubmitted = existing != null; _isCheckingDuplicate = false; });
+    } catch (_) {
+      if (mounted) setState(() => _isCheckingDuplicate = false);
+    }
+  }
 
   // ── validation ──────────────────────────────
   String? _validate() {
@@ -107,13 +215,12 @@ class _SurveyScreenState extends State<SurveyScreen>
       ));
       return;
     }
-    final companyName = _companyController.text.trim();
     setState(() => _isSubmitting = true);
     try {
       await _db.from('Survey').insert({
         'user_id':               widget.userId,
         'internship_id':         _selectedInternship!['id'],
-        'company_name':         companyName.isEmpty ? _selectedInternship!['company'] : companyName,
+        'company_name':          _selectedInternship!['company'],
         // A: General Experience
         'overall_rating':        _overallRating,
         'would_recommend':       _wouldRecommend,
@@ -223,54 +330,220 @@ class _SurveyScreenState extends State<SurveyScreen>
   }
 
   // ── internship picker ───────────────────────
- Widget _buildInternshipPicker() {
-  return _SurveyCard(
-    accent: _accentBlue,
-    icon: Icons.business_center_rounded,
-    title: 'Company Name',
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        TextField(
-          controller: _companyController,
-          decoration: const InputDecoration(
-            labelText: 'Enter company name (e.g. Google)',
-          ),
-          onChanged: (value) {
-            setState(() {
-              _selectedInternship = {
-                'company': value,
-                'department': ''
-              };
-            });
-          },
-        ),
-
-        if (_isCheckingDuplicate)
-          const Padding(
-            padding: EdgeInsets.only(top: 10),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 14,
-                  height: 14,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: _accentBlue,
-                  ),
-                ),
-                SizedBox(width: 8),
-                Text(
-                  'Checking...',
-                  style: TextStyle(fontSize: 12, color: _textGrey),
-                ),
-              ],
+  Widget _buildInternshipPicker() {
+    return _SurveyCard(
+      accent: _accentBlue,
+      icon: Icons.business_center_rounded,
+      title: 'Select Internship / Company',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Search field ──
+          TextField(
+            controller: _searchCtrl,
+            style: const TextStyle(fontSize: 14, color: _textDark),
+            decoration: InputDecoration(
+              hintText: 'Type a company or internship name...',
+              hintStyle: const TextStyle(color: Color(0xFFADB5BD), fontSize: 13),
+              filled: true,
+              fillColor: const Color(0xFFF8FAFC),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF94A3B8), size: 18),
+              suffixIcon: _searchCtrl.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.close_rounded, size: 16, color: Color(0xFF94A3B8)),
+                      onPressed: () {
+                        _searchCtrl.clear();
+                        setState(() {
+                          _selectedInternship = null;
+                          _dropdownOpen = false;
+                          _alreadySubmitted = false;
+                        });
+                      })
+                  : null,
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: _border)),
+              enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: _border)),
+              focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: _accentBlue, width: 1.8)),
             ),
           ),
-      ],
-    ),
-  );
-}
+
+          // ── Loading indicator ──
+          if (_searchLoading)
+            const Padding(
+              padding: EdgeInsets.only(top: 10),
+              child: Row(children: [
+                SizedBox(width: 14, height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: _accentBlue)),
+                SizedBox(width: 8),
+                Text('Loading options...', style: TextStyle(fontSize: 12, color: _textGrey)),
+              ]),
+            ),
+
+          // ── Dropdown results ──
+          if (_dropdownOpen && _filteredOptions.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.only(top: 6),
+              constraints: const BoxConstraints(maxHeight: 220),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: _border),
+                boxShadow: [
+                  BoxShadow(color: _accentBlue.withOpacity(0.08),
+                      blurRadius: 14, offset: const Offset(0, 4))
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  padding: EdgeInsets.zero,
+                  itemCount: _filteredOptions.length,
+                  itemBuilder: (_, i) {
+                    final opt = _filteredOptions[i];
+                    final isLast = i == _filteredOptions.length - 1;
+                    return InkWell(
+                      onTap: () => _selectOption(opt),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 11),
+                        decoration: BoxDecoration(
+                          border: isLast
+                              ? null
+                              : const Border(
+                                  bottom: BorderSide(color: _border, width: 0.8)),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 34, height: 34,
+                              decoration: BoxDecoration(
+                                color: _sourceColor(opt.source).withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(_sourceIcon(opt.source),
+                                  size: 16, color: _sourceColor(opt.source)),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(opt.company,
+                                      style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w700,
+                                          color: _textDark),
+                                      overflow: TextOverflow.ellipsis),
+                                  if (opt.role.isNotEmpty)
+                                    Text(opt.role,
+                                        style: const TextStyle(
+                                            fontSize: 11, color: _textGrey),
+                                        overflow: TextOverflow.ellipsis),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 7, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: _sourceColor(opt.source).withOpacity(0.10),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(_sourceLabel(opt.source),
+                                  style: TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w700,
+                                      color: _sourceColor(opt.source))),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+
+          if (_dropdownOpen && _filteredOptions.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text('No matches found.',
+                  style: const TextStyle(fontSize: 12, color: _textGrey)),
+            ),
+
+          // ── Selected confirmation ──
+          if (_selectedInternship != null && !_dropdownOpen) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: _accentBlue.withOpacity(0.07),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: _accentBlue.withOpacity(0.25)),
+              ),
+              child: Row(children: [
+                const Icon(Icons.check_circle_rounded,
+                    size: 16, color: _accentBlue),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Selected: ${_selectedInternship!['company']}',
+                    style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: _accentBlue),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ]),
+            ),
+          ],
+
+          if (_isCheckingDuplicate)
+            const Padding(
+              padding: EdgeInsets.only(top: 10),
+              child: Row(children: [
+                SizedBox(width: 14, height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: _accentBlue)),
+                SizedBox(width: 8),
+                Text('Checking...', style: TextStyle(fontSize: 12, color: _textGrey)),
+              ]),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Color _sourceColor(String src) {
+    switch (src) {
+      case 'manual':  return _accentPurple;
+      case 'applied': return _accentGreen;
+      default:        return _accentBlue;
+    }
+  }
+
+  IconData _sourceIcon(String src) {
+    switch (src) {
+      case 'manual':  return Icons.history_edu_rounded;
+      case 'applied': return Icons.check_circle_outline_rounded;
+      default:        return Icons.business_rounded;
+    }
+  }
+
+  String _sourceLabel(String src) {
+    switch (src) {
+      case 'manual':  return 'MY HISTORY';
+      case 'applied': return 'APPLIED';
+      default:        return 'COMPANY';
+    }
+  }
   Widget _buildAlreadySubmittedBanner() {
     return Container(
       margin: const EdgeInsets.only(top: 12),
@@ -466,6 +739,9 @@ class _SurveyScreenState extends State<SurveyScreen>
                     _submitted = false;
                     _successCtrl.reset();
                     _selectedInternship = null;
+                    _searchCtrl.clear();
+                    _dropdownOpen = false;
+                    _alreadySubmitted = false;
                     _overallRating = _mentorQuality = _communication = 0;
                     _workMode = 'Onsite';
                     _tasksAligned = true;
@@ -662,4 +938,23 @@ class _Circle extends StatelessWidget {
     width: size, height: size,
     decoration: BoxDecoration(shape: BoxShape.circle, color: color),
   );
+}
+
+// ─────────────────────────────────────────────
+// SURVEY OPTION MODEL
+// ─────────────────────────────────────────────
+class _SurveyOption {
+  final int    id;
+  final String company;
+  final String role;
+  final String source; // 'manual' | 'applied' | 'company'
+  final Map<String, dynamic> raw;
+
+  const _SurveyOption({
+    required this.id,
+    required this.company,
+    required this.role,
+    required this.source,
+    required this.raw,
+  });
 }

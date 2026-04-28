@@ -4,6 +4,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'StudentHome.dart';
 import 'survey.dart';
+import 'internships_page.dart';
+import 'Login_Signup.dart';
+import 'app_session.dart';
 
 // ─── COLORS ────────────────────────────
 const _blue      = Color(0xFF3B82F6);
@@ -232,7 +235,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isLoading        = true;
   bool _skillsDeleteMode = false;
   int  _navIndex         = 2; // 0=Home 1=Internships 2=Profile 3=Surveys
-  int _surveyCount = 0;
+  int _surveyCount       = 0;
+  int _appliedJobsCount  = 0; // applications to company-posted jobs
   @override
   void initState() {
     super.initState();
@@ -248,13 +252,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final certs = await _db.from('Certificates').select().eq('user_id', widget.id).order('id', ascending: false);
       final internships = await _db.from('Internships').select().eq('user_id', widget.id).order('id', ascending: false);
       final surveyes = await _db.from('Survey').select('').eq('user_id', widget.id);
+      final appliedJobs = await _db.from('Job_applications').select('id').eq('student_id', widget.id);
       if (!mounted) return;
       setState(() {
         _user        = user;
         _info        = infoList.isNotEmpty ? infoList.first : null;
         _certs       = List<Map<String, dynamic>>.from(certs);
         _internships = List<Map<String, dynamic>>.from(internships);
-        _surveyCount = surveyes.length;
+        _surveyCount       = surveyes.length;
+        _appliedJobsCount  = (appliedJobs as List).length;
         _isLoading   = false;
       });
 
@@ -272,6 +278,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
 
+    if (index == 1) {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => InternshipsPage(
+            userId:      widget.id,
+            userName:    _user?['name']  ?? '',
+            userEmail:   _user?['email'] ?? '',
+          ),
+        ),
+      );
+      // Refresh applied count when returning
+      await _fetchAll();
+      setState(() => _navIndex = 2);
+      return;
+    }
+
     if (_navIndex == index && index != 2) return;
 
     setState(() => _navIndex = index);
@@ -279,6 +301,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (index == 2) {
       await _fetchAll();
     }
+  }
+
+  // ── Settings ─────────────────────────────────────────────────
+
+  void _openSettings() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      builder: (ctx) => _SettingsSheet(
+        userId: widget.id,
+        currentName:  _user?['name']  ?? '',
+        currentPhone: _user?['phone'] ?? '',
+        db: _db,
+        onSaved: () { Navigator.pop(ctx); _fetchAll(); },
+        onLogout: () {
+          Navigator.pop(ctx);
+          AppSession.clear();
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const AuthScreen()),
+            (route) => false,
+          );
+        },
+      ),
+    );
   }
 
   String _getInitials(String name) =>
@@ -809,7 +859,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       Text('My Profile',
                           style: TextStyle(fontSize: (sw * 0.055).clamp(18.0, 24.0),
                               fontWeight: FontWeight.w800, color: _textDark, letterSpacing: -0.3)),
-                      _RippleIconBtn(icon: Icons.settings_outlined, onTap: () {}),
+                      _RippleIconBtn(icon: Icons.settings_outlined, onTap: _openSettings),
                     ],
                   ),
                 ),
@@ -896,7 +946,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: Padding(
                   padding: EdgeInsets.fromLTRB(hPad, 14, hPad, 0),
                   child: Row(children: [
-                    _StatCard(value: '${_internships.length}', label: 'Internships\nApplied'),
+                    _StatCard(value: '${_internships.length + _appliedJobsCount}', label: 'Internships\nApplied'),
                     const SizedBox(width: 10),
                     _StatCard(value: '${_certs.length}', label: 'Certificates\nUploaded'),
                     const SizedBox(width: 10),
@@ -1161,6 +1211,211 @@ class _CertCard extends StatelessWidget {
         const SizedBox(height: 10),
         const Divider(color: _border),
       ]),
+    );
+  }
+}
+
+// ─── SETTINGS SHEET ──────────────────────
+class _SettingsSheet extends StatefulWidget {
+  final int    userId;
+  final String currentName;
+  final String currentPhone;
+  final SupabaseClient db;
+  final VoidCallback onSaved;
+  final VoidCallback onLogout;
+
+  const _SettingsSheet({
+    required this.userId,
+    required this.currentName,
+    required this.currentPhone,
+    required this.db,
+    required this.onSaved,
+    required this.onLogout,
+  });
+
+  @override
+  State<_SettingsSheet> createState() => _SettingsSheetState();
+}
+
+class _SettingsSheetState extends State<_SettingsSheet> {
+  late final TextEditingController _nameCtrl;
+  late final TextEditingController _phoneCtrl;
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameCtrl  = TextEditingController(text: widget.currentName);
+    _phoneCtrl = TextEditingController(text: widget.currentPhone);
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _phoneCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final name  = _nameCtrl.text.trim();
+    final phone = _phoneCtrl.text.trim();
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Name cannot be empty.')),
+      );
+      return;
+    }
+    setState(() => _isSaving = true);
+    try {
+      await widget.db
+          .from('User_profile')
+          .update({'name': name, 'phone': phone})
+          .eq('id', widget.userId);
+      widget.onSaved();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  InputDecoration _dec(String hint, IconData icon) => InputDecoration(
+    hintText: hint,
+    hintStyle: const TextStyle(color: Color(0xFFADB5BD), fontSize: 13),
+    filled: true, fillColor: const Color(0xFFF8FAFC),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+    prefixIcon: Icon(icon, color: const Color(0xFF94A3B8), size: 18),
+    border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: _border)),
+    enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: _border)),
+    focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: _blue, width: 1.8)),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 20, right: 20, top: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Handle
+          Center(
+            child: Container(
+              width: 40, height: 4,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                color: _border, borderRadius: BorderRadius.circular(2)),
+            ),
+          ),
+
+          const Text('Settings',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: _textDark)),
+          const SizedBox(height: 20),
+
+          // Edit name
+          const Text('Full Name',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _textDark)),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _nameCtrl,
+            style: const TextStyle(fontSize: 14, color: _textDark),
+            decoration: _dec('Your full name', Icons.person_outline_rounded),
+          ),
+
+          const SizedBox(height: 14),
+
+          // Edit phone
+          const Text('Phone Number',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _textDark)),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _phoneCtrl,
+            keyboardType: TextInputType.phone,
+            style: const TextStyle(fontSize: 14, color: _textDark),
+            decoration: _dec('+20 123 456 7890', Icons.phone_outlined),
+          ),
+
+          const SizedBox(height: 20),
+
+          // Save button
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton(
+              onPressed: _isSaving ? null : _save,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _blue,
+                foregroundColor: _white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+              child: _isSaving
+                  ? const SizedBox(width: 20, height: 20,
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : const Text('Save Changes',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+            ),
+          ),
+
+          const SizedBox(height: 10),
+
+          // Logout button
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16)),
+                    title: const Text('Log Out',
+                        style: TextStyle(fontWeight: FontWeight.w700)),
+                    content: const Text('Are you sure you want to log out?'),
+                    actions: [
+                      TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('Cancel',
+                              style: TextStyle(color: _textGrey))),
+                      ElevatedButton(
+                        onPressed: () { Navigator.pop(ctx); widget.onLogout(); },
+                        style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                            foregroundColor: _white,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8))),
+                        child: const Text('Log Out'),
+                      ),
+                    ],
+                  ),
+                );
+              },
+              icon: const Icon(Icons.logout_rounded, color: Colors.red, size: 18),
+              label: const Text('Log Out',
+                  style: TextStyle(color: Colors.red, fontSize: 15, fontWeight: FontWeight.w700)),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Colors.red, width: 1.4),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
