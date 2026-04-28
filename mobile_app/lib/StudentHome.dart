@@ -36,15 +36,15 @@ const _textDark = Color(0xFF1E1B4B);
 const _textGrey = Color(0xFF6B7280);
 const _border = Color(0xFFE5E7EB);
 
-final _activityTabs = ['All', 'Applied', 'Interviews', 'Offers', 'Rejected'];
+const _appliedColor = Color(0xFF3B82F6);
+const _acceptedColor = Color(0xFF10B981);
+const _rejectedColor = Color(0xFFEF4444);
+const _interviewColor = Color(0xFF7C3AED);
 
-final _applications = [
-  _AppData(company: 'Google', role: 'Flutter Intern', status: 'Interview', color: Color(0xFF4285F4), initials: 'G'),
-  _AppData(company: 'Microsoft', role: 'Software Intern', status: 'Applied', color: Color(0xFF00A4EF), initials: 'M'),
-  _AppData(company: 'Amazon', role: 'Cloud Intern', status: 'Pending', color: Color(0xFFFF9900), initials: 'A'),
-  _AppData(company: 'Meta', role: 'UI/UX Intern', status: 'Rejected', color: Color(0xFF1877F2), initials: 'Me'),
-  _AppData(company: 'Apple', role: 'iOS Intern', status: 'Offer', color: Color(0xFF555555), initials: 'Ap'),
-];
+final _activityTabs = ['All', 'Applied', 'Interview', 'Rejected'];
+const _tabStatuses = ['', 'pending', 'interview', 'rejected'];
+
+String _getInitials(String name) => name.trim().split(' ').where((e) => e.isNotEmpty).take(2).map((e) => e[0].toUpperCase()).join();
 
 final _aiTools = [
   _AiTool(title: 'Resume Analyzer', subtitle: 'Get AI feedback on your CV', icon: Icons.description_outlined, grad: [Color(0xFF7C3AED), Color(0xFF4F46E5)]),
@@ -58,19 +58,6 @@ final _announcements = [
   _Announcement(title: 'New Partnerships', body: 'The faculty has signed agreements with 12 new tech companies offering internship positions for 2025.', date: '3 days ago', tag: 'News', tagColor: _blue),
   _Announcement(title: 'Survey Reminder', body: 'Please fill in the internship experience survey by end of this week. It takes only 5 minutes.', date: '5 days ago', tag: 'Reminder', tagColor: Color(0xFF059669)),
 ];
-
-class _AppData {
-  final String company, role, status, initials;
-  final Color color;
-
-  const _AppData({
-    required this.company,
-    required this.role,
-    required this.status,
-    required this.color,
-    required this.initials,
-  });
-}
 
 class _AiTool {
   final String title, subtitle;
@@ -110,7 +97,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final _db = Supabase.instance.client;
 
-  int _activeTab = 0;
+  int _filterIndex = 0;
   int _navIndex = 0;
   bool _isLoading = true;
 
@@ -118,6 +105,7 @@ class _HomePageState extends State<HomePage> {
   String _username = 'Student';
   String _email = '';
   List<Map<String, dynamic>> _internships = [];
+  List<Map<String, dynamic>> _applications = [];
 
   @override
   void initState() {
@@ -146,12 +134,24 @@ class _HomePageState extends State<HomePage> {
         internships = List<Map<String, dynamic>>.from(internshipRows);
       }
 
+      List<Map<String, dynamic>> applications = [];
+      if (user != null) {
+        final appsRows = await _db.from('Job_applications').select('*, Job_postings!inner(title, company_id, Company_profile!inner(name))').eq('student_id', user['id']).order('applied_at', ascending: false);
+        applications = appsRows.map((row) => {
+          'job_title': row['Job_postings']['title'] as String,
+          'company_name': row['Job_postings']['Company_profile']['name'] as String,
+          'status': row['status'] as String,
+          'applied_at': row['applied_at'] as String?,
+        }).toList();
+      }
+
       if (!mounted) return;
       setState(() {
         _userId = user?['id'] as int?;
         _username = ((user?['name'] ?? '') as String).trim().isEmpty ? 'Student' : user!['name'] as String;
         _email = (user?['email'] ?? '') as String;
         _internships = internships;
+        _applications = applications;
         _isLoading = false;
       });
 
@@ -311,9 +311,9 @@ class _HomePageState extends State<HomePage> {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         itemCount: _activityTabs.length,
         itemBuilder: (_, i) {
-          final active = i == _activeTab;
+          final active = i == _filterIndex;
           return GestureDetector(
-            onTap: () => setState(() => _activeTab = i),
+            onTap: () => setState(() => _filterIndex = i),
             child: Container(
               margin: const EdgeInsets.only(right: 6),
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
@@ -358,14 +358,15 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildApplicationsList() {
+    final filtered = _filterIndex == 0 ? _applications : _applications.where((a) => a['status'] == _tabStatuses[_filterIndex]).toList();
     return SizedBox(
       height: 130,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: _applications.length,
+        itemCount: filtered.length,
         itemBuilder: (_, i) {
-          final app = _applications[i];
+          final app = filtered[i];
           return _ApplicationCard(app: app);
         },
       ),
@@ -389,22 +390,27 @@ class _HomePageState extends State<HomePage> {
 }
 
 class _ApplicationCard extends StatelessWidget {
-  final _AppData app;
+  final Map<String, dynamic> app;
 
   const _ApplicationCard({required this.app});
 
   Color get _statusColor {
-    switch (app.status) {
-      case 'Interview':
-        return const Color(0xFF7C3AED);
-      case 'Offer':
-        return const Color(0xFF059669);
-      case 'Rejected':
-        return const Color(0xFFDC2626);
-      case 'Applied':
-        return const Color(0xFF2563EB);
-      default:
-        return const Color(0xFF9CA3AF);
+    switch (app['status']) {
+      case 'pending': return _appliedColor;
+      case 'accepted': return _acceptedColor;
+      case 'rejected': return _rejectedColor;
+      case 'interview': return _interviewColor;
+      default: return _appliedColor;
+    }
+  }
+
+  String get _displayStatus {
+    switch (app['status']) {
+      case 'pending': return 'Applied';
+      case 'accepted': return 'Accepted';
+      case 'rejected': return 'Rejected';
+      case 'interview': return 'Interview';
+      default: return app['status'];
     }
   }
 
@@ -427,21 +433,21 @@ class _ApplicationCard extends StatelessWidget {
               Container(
                 width: 36,
                 height: 36,
-                decoration: BoxDecoration(color: app.color.withOpacity(0.12), borderRadius: BorderRadius.circular(10)),
-                child: Center(child: Text(app.initials, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: app.color))),
+                decoration: BoxDecoration(color: _statusColor.withOpacity(0.12), borderRadius: BorderRadius.circular(10)),
+                child: Center(child: Text(_getInitials(app['company_name']), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: _statusColor))),
               ),
               const Spacer(),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                 decoration: BoxDecoration(color: _statusColor.withOpacity(0.10), borderRadius: BorderRadius.circular(20)),
-                child: Text(app.status, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: _statusColor)),
+                child: Text(_displayStatus, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: _statusColor)),
               ),
             ],
           ),
           const Spacer(),
-          Text(app.company, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _textDark), overflow: TextOverflow.ellipsis),
+          Text(app['company_name'], style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _textDark), overflow: TextOverflow.ellipsis),
           const SizedBox(height: 2),
-          Text(app.role, style: const TextStyle(fontSize: 11, color: _textGrey), overflow: TextOverflow.ellipsis),
+          Text(app['job_title'], style: const TextStyle(fontSize: 11, color: _textGrey), overflow: TextOverflow.ellipsis),
         ],
       ),
     );
