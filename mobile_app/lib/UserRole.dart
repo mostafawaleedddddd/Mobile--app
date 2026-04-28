@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'Login_SignUp.dart'; // your existing AuthScreen lives here
 import 'company_auth.dart';
+import 'Faculty_Auth.dart';
 // ─────────────────────────────────────────────
 // COLORS
 // ─────────────────────────────────────────────
@@ -138,21 +139,15 @@ class _UserRoleState extends State<UserRole> with TickerProviderStateMixin {
         ),
       );
     } else {
-      // Coming soon snackbar for other roles
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '${_roles[_selected!].title} portal coming soon!',
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          ),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: _roles[_selected!].accentColor,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          margin: const EdgeInsets.all(16),
-        ),
-      );
+     Navigator.push(
+    context,
+    PageRouteBuilder(
+      pageBuilder: (_, a, __) => const FacultyAuthScreen(),
+      transitionsBuilder: (_, anim, __, child) =>
+          FadeTransition(opacity: anim, child: child),
+      transitionDuration: const Duration(milliseconds: 420),
+    ),
+  );
     }
   }
 

@@ -1,6 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
 import 'app_session.dart';
 import 'User_profile.dart';
 import 'survey.dart';
@@ -52,13 +52,6 @@ final _aiTools = [
   _AiTool(title: 'Interview Prep', subtitle: 'Practice mock interviews', icon: Icons.record_voice_over_outlined, grad: [Color(0xFF0284C7), Color(0xFF06B6D4)]),
 ];
 
-final _announcements = [
-  _Announcement(title: 'Internship Fair 2025', body: 'The annual internship fair will be held on May 20th at the Engineering campus. Over 40 companies attending.', date: '2 hours ago', tag: 'Event', tagColor: _violet),
-  _Announcement(title: 'CV Submission Deadline', body: 'Students applying for summer internships must upload their CV before April 30th through the portal.', date: '1 day ago', tag: 'Important', tagColor: _pink),
-  _Announcement(title: 'New Partnerships', body: 'The faculty has signed agreements with 12 new tech companies offering internship positions for 2025.', date: '3 days ago', tag: 'News', tagColor: _blue),
-  _Announcement(title: 'Survey Reminder', body: 'Please fill in the internship experience survey by end of this week. It takes only 5 minutes.', date: '5 days ago', tag: 'Reminder', tagColor: Color(0xFF059669)),
-];
-
 class _AiTool {
   final String title, subtitle;
   final IconData icon;
@@ -73,15 +66,15 @@ class _AiTool {
 }
 
 class _Announcement {
-  final String title, body, date, tag;
-  final Color tagColor;
+  final String title, body, date, type;
+  final Color typeColor;
 
   const _Announcement({
     required this.title,
     required this.body,
     required this.date,
-    required this.tag,
-    required this.tagColor,
+    required this.type,
+    required this.typeColor,
   });
 }
 
@@ -96,7 +89,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final _db = Supabase.instance.client;
-
+  Timer? _refreshTimer;
   int _filterIndex = 0;
   int _navIndex = 0;
   bool _isLoading = true;
@@ -111,6 +104,17 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _loadCurrentUser();
+    _refreshTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
+      if (mounted) {
+        setState(() {
+        });
+      }
+    });
+  }
+  @override
+  void dispose() {
+    _refreshTimer?.cancel(); 
+    super.dispose();
   }
 
   Future<void> _loadCurrentUser() async {
@@ -228,28 +232,109 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildHomeBody() {
-    return SafeArea(
-      child: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(child: _buildWelcomeHeader()),
-          SliverToBoxAdapter(child: _buildActivityTabs()),
-          SliverToBoxAdapter(child: _buildSectionHeader('My Applications', 'View All', () {})),
-          SliverToBoxAdapter(child: _buildApplicationsList()),
-          SliverToBoxAdapter(child: _buildSectionHeader('AI Tools', '', null)),
-          SliverToBoxAdapter(child: _buildAiTools()),
-          SliverToBoxAdapter(child: _buildSectionHeader('University Announcements', 'View All', () {})),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-              child: Column(
-                children: _announcements.map((a) => _AnnouncementCard(a: a)).toList(),
-              ),
+  return SafeArea(
+    child: CustomScrollView(
+      slivers: [
+        SliverToBoxAdapter(child: _buildWelcomeHeader()),
+        SliverToBoxAdapter(child: _buildActivityTabs()),
+        SliverToBoxAdapter(child: _buildSectionHeader('My Applications', 'View All', () {})),
+        SliverToBoxAdapter(child: _buildApplicationsList()),
+        SliverToBoxAdapter(child: _buildSectionHeader('AI Tools', '', null)),
+        SliverToBoxAdapter(child: _buildAiTools()),
+        SliverToBoxAdapter(child: _buildSectionHeader('University Announcements', 'View All', () {})),
+        
+        // --- DYNAMIC ANNOUNCEMENTS SECTION START ---
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+            child: StreamBuilder<List<Map<String, dynamic>>>(
+              // Using lowercase table name to avoid 404 errors shown in your logs
+              stream: Supabase.instance.client
+                  .from('university_announcements') 
+                  .stream(primaryKey: ['id'])
+                  .order('created_at', ascending: false),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(20.0),
+                      child: CircularProgressIndicator(),
+                    ),
+                  );
+                }
+
+                final liveData = snapshot.data ?? [];
+
+                if (liveData.isEmpty) {
+                  return const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(20.0),
+                      child: Text("No university announcements yet."),
+                    ),
+                  );
+                }
+
+                return Column(
+                  // Mapping the live database records to your existing _AnnouncementCard
+                  children: liveData.map((item) {
+                    final a = _Announcement(
+                      title: item['title'] ?? 'Untitled',
+                      body: item['description'] ?? '',
+                      date: _formatTimeAgo(item['created_at']), // Formats to "2 hours ago"
+                      type: item['type'] ?? 'News',
+                      typeColor: _getLiveTypeColor(item['type']), // Matches colors: Violet, Pink, Blue
+                    );
+                    return _AnnouncementCard(a: a);
+                  }).toList(),
+                );
+              },
             ),
           ),
-        ],
-      ),
-    );
+        ),
+        // --- DYNAMIC ANNOUNCEMENTS SECTION END ---
+      ],
+    ),
+  );
+}
+
+// Helper to keep your UI colors consistent with your design
+Color _getLiveTypeColor(String? type) {
+  switch (type) {
+    case 'Event': return const Color(0xFF8B5CF6);      // Violet
+    case 'Important': return const Color(0xFFEC4899);  // Pink
+    case 'News': return const Color(0xFF3B82F6);       // Blue
+    case 'Reminder': return const Color(0xFF059669);   // Green
+    default: return Colors.blueGrey;
   }
+}
+
+// Helper to turn database timestamps into readable strings
+String _formatTimeAgo(String? timestamp) {
+  if (timestamp == null) return "Just now";
+  
+  // Parse the UTC time from Supabase correctly
+  DateTime postDate = DateTime.parse(timestamp).toLocal();
+  DateTime now = DateTime.now();
+  
+  // Use difference and take the absolute value to avoid negative numbers
+  Duration diff = now.difference(postDate);
+  
+  // If the difference is negative or very small, just say "Just now"
+  if (diff.isNegative || diff.inSeconds < 60) {
+    return "Just now";
+  }
+
+  if (diff.inMinutes < 60) {
+    return "${diff.inMinutes} mins ago";
+  } else if (diff.inHours < 24) {
+    return "${diff.inHours} hours ago";
+  } else if (diff.inDays < 7) {
+    return "${diff.inDays} days ago";
+  } else {
+    // For older posts, show the date
+    return "${postDate.day}/${postDate.month}/${postDate.year}";
+  }
+}
 
   Widget _buildWelcomeHeader() {
     return Padding(
@@ -510,7 +595,7 @@ class _AnnouncementCard extends StatelessWidget {
           Container(
             width: 4,
             height: 60,
-            decoration: BoxDecoration(color: a.tagColor, borderRadius: BorderRadius.circular(2)),
+            decoration: BoxDecoration(color: a.typeColor, borderRadius: BorderRadius.circular(2)),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -521,8 +606,8 @@ class _AnnouncementCard extends StatelessWidget {
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(color: a.tagColor.withOpacity(0.10), borderRadius: BorderRadius.circular(20)),
-                      child: Text(a.tag, style: TextStyle(fontSize: 10, color: a.tagColor, fontWeight: FontWeight.w700)),
+                      decoration: BoxDecoration(color: a.typeColor.withOpacity(0.10), borderRadius: BorderRadius.circular(20)),
+                      child: Text(a.type, style: TextStyle(fontSize: 10, color: a.typeColor, fontWeight: FontWeight.w700)),
                     ),
                     const Spacer(),
                     Text(a.date, style: const TextStyle(fontSize: 11, color: _textGrey)),
