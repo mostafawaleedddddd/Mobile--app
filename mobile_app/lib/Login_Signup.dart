@@ -60,6 +60,7 @@ class _AuthScreenState extends State<AuthScreen>
       backgroundColor: const Color(0xFFF0F7FF),
       body: Stack(
         children: [
+          // ─── BACKGROUND BLOBS ───
           Positioned(
             top: -sh * 0.07,
             left: -sw * 0.18,
@@ -70,6 +71,8 @@ class _AuthScreenState extends State<AuthScreen>
             right: -sw * 0.14,
             child: _Blob(size: sw * 0.65, color: _blue.withOpacity(0.07)),
           ),
+
+          // ─── MAIN CONTENT ───
           SafeArea(
             child: Center(
               child: SingleChildScrollView(
@@ -100,11 +103,53 @@ class _AuthScreenState extends State<AuthScreen>
               ),
             ),
           ),
+
+          // ─── BACK BUTTON (ALWAYS ON TOP) ───
+          Positioned(
+            top: 0,
+            left: 0,
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Material(
+                  color: Colors.transparent, // important for click
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black12,
+                          blurRadius: 6,
+                        ),
+                      ],
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.arrow_back),
+                      color: _textDark,
+                      onPressed: () {
+                        print("BACK CLICKED"); // debug
+
+                        if (_showRegister) {
+                          _flip(); // go back to login
+                        } else if (Navigator.canPop(context)) {
+                          Navigator.pop(context);
+                        }
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 }
+
 
 class _Blob extends StatelessWidget {
   final double size;

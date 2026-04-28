@@ -40,7 +40,7 @@ class CompanyAuthScreen extends StatefulWidget {
 class _CompanyAuthScreenState extends State<CompanyAuthScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _ctrl;
-  late Animation<double>   _anim;
+  late Animation<double> _anim;
   bool _showRegister = false;
 
   @override
@@ -72,7 +72,7 @@ class _CompanyAuthScreenState extends State<CompanyAuthScreen>
       backgroundColor: _tealBg,
       body: Stack(
         children: [
-          // Decorative blobs
+          // ─── BACKGROUND BLOBS ───
           Positioned(
             top: -sh * 0.07,
             left: -sw * 0.18,
@@ -84,6 +84,7 @@ class _CompanyAuthScreenState extends State<CompanyAuthScreen>
             child: _Blob(size: sw * 0.65, color: _teal.withOpacity(0.07)),
           ),
 
+          // ─── MAIN CONTENT ───
           SafeArea(
             child: Center(
               child: SingleChildScrollView(
@@ -94,7 +95,7 @@ class _CompanyAuthScreenState extends State<CompanyAuthScreen>
                 child: AnimatedBuilder(
                   animation: _anim,
                   builder: (_, __) {
-                    final angle    = _anim.value * pi;
+                    final angle = _anim.value * pi;
                     final showFront = angle < pi / 2;
                     return Transform(
                       alignment: Alignment.center,
@@ -114,11 +115,53 @@ class _CompanyAuthScreenState extends State<CompanyAuthScreen>
               ),
             ),
           ),
+
+          // ─── BACK BUTTON (ON TOP) ───
+          Positioned(
+            top: 0,
+            left: 0,
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Material(
+                  color: Colors.transparent,
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black12,
+                          blurRadius: 6,
+                        ),
+                      ],
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.arrow_back),
+                      color: Colors.black87,
+                      onPressed: () {
+                        print("BACK CLICKED"); // debug
+
+                        if (_showRegister) {
+                          _flip(); // go back to login
+                        } else if (Navigator.canPop(context)) {
+                          Navigator.pop(context);
+                        }
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 }
+
 
 // ─── BLOB ─────────────────────────────────────────────────────────────────────
 class _Blob extends StatelessWidget {
