@@ -7,6 +7,7 @@ import 'survey.dart';
 import 'internships_page.dart';
 import 'Login_Signup.dart';
 import 'app_session.dart';
+import 'UserRole.dart';
 
 // ─── COLORS ────────────────────────────
 const _blue      = Color(0xFF3B82F6);
@@ -323,7 +324,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Navigator.pop(ctx);
           AppSession.clear();
           Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (_) => const AuthScreen()),
+            MaterialPageRoute(builder: (_) => const UserRole()),
             (route) => false,
           );
         },
