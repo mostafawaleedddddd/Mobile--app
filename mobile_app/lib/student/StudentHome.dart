@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'app_session.dart';
+import '../app_session.dart';
 import 'User_profile.dart';
 import 'survey.dart';
 
@@ -29,7 +29,7 @@ const _violet = Color(0xFF7C3AED);
 //const _violetL = Color(0xFFEDE9FE);
 const _blue = Color(0xFF3B82F6);
 const _blueL = Color(0xFFEFF6FF);
-const _pink = Color(0xFFEC4899);
+// const _pink = Color(0xFFEC4899);
 const _bg = Color(0xFFF8F7FF);
 const _white = Colors.white;
 const _textDark = Color(0xFF1E1B4B);
@@ -241,100 +241,72 @@ class _HomePageState extends State<HomePage> {
         SliverToBoxAdapter(child: _buildApplicationsList()),
         SliverToBoxAdapter(child: _buildSectionHeader('AI Tools', '', null)),
         SliverToBoxAdapter(child: _buildAiTools()),
-        SliverToBoxAdapter(child: _buildSectionHeader('University Announcements', 'View All', () {})),
+        SliverToBoxAdapter(
+  child: _buildSectionHeader(
+    'University Announcements', 
+    'View All', 
+    () {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const AllAnnouncementsScreen()),
+      );
+    },
+  ),
+),
         
         // --- DYNAMIC ANNOUNCEMENTS SECTION START ---
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-            child: StreamBuilder<List<Map<String, dynamic>>>(
-              // Using lowercase table name to avoid 404 errors shown in your logs
-              stream: Supabase.instance.client
-                  .from('university_announcements') 
-                  .stream(primaryKey: ['id'])
-                  .order('created_at', ascending: false),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(20.0),
-                      child: CircularProgressIndicator(),
-                    ),
-                  );
-                }
+SliverToBoxAdapter(
+  child: Padding(
+    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+    child: StreamBuilder<List<Map<String, dynamic>>>(
+      stream: Supabase.instance.client
+          .from('university_announcements') 
+          .stream(primaryKey: ['id'])
+          .order('created_at', ascending: false),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-                final liveData = snapshot.data ?? [];
+        final liveData = snapshot.data ?? [];
+        
+        // This is the filter
+        final previewData = liveData.take(3).toList();
+        
+        // DEBUG: Check your console to see this number change to 3
+        print("Total in DB: ${liveData.length} | Showing on Home: ${previewData.length}");
 
-                if (liveData.isEmpty) {
-                  return const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(20.0),
-                      child: Text("No university announcements yet."),
-                    ),
-                  );
-                }
-
-                return Column(
-                  // Mapping the live database records to your existing _AnnouncementCard
-                  children: liveData.map((item) {
-                    final a = _Announcement(
-                      title: item['title'] ?? 'Untitled',
-                      body: item['description'] ?? '',
-                      date: _formatTimeAgo(item['created_at']), // Formats to "2 hours ago"
-                      type: item['type'] ?? 'News',
-                      typeColor: _getLiveTypeColor(item['type']), // Matches colors: Violet, Pink, Blue
-                    );
-                    return _AnnouncementCard(a: a);
-                  }).toList(),
-                );
-              },
+        if (previewData.isEmpty) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(20.0),
+              child: Text("No university announcements yet."),
             ),
-          ),
-        ),
-        // --- DYNAMIC ANNOUNCEMENTS SECTION END ---
+          );
+        }
+
+        return Column(
+          // We MUST map previewData here
+          children: previewData.map((item) {
+            final a = _Announcement(
+              title: item['title'] ?? 'Untitled',
+              body: item['description'] ?? '',
+              date: _formatTimeAgo(item['created_at']), 
+              type: item['type'] ?? 'News',
+              typeColor: _getLiveTypeColor(item['type']),
+            );
+            return _AnnouncementCard(a: a);
+          }).toList(),
+        );
+      },
+    ),
+  ),
+),
       ],
     ),
   );
 }
 
-// Helper to keep your UI colors consistent with your design
-Color _getLiveTypeColor(String? type) {
-  switch (type) {
-    case 'Event': return const Color(0xFF8B5CF6);      // Violet
-    case 'Important': return const Color(0xFFEC4899);  // Pink
-    case 'News': return const Color(0xFF3B82F6);       // Blue
-    case 'Reminder': return const Color(0xFF059669);   // Green
-    default: return Colors.blueGrey;
-  }
-}
-
-// Helper to turn database timestamps into readable strings
-String _formatTimeAgo(String? timestamp) {
-  if (timestamp == null) return "Just now";
-  
-  // Parse the UTC time from Supabase correctly
-  DateTime postDate = DateTime.parse(timestamp).toLocal();
-  DateTime now = DateTime.now();
-  
-  // Use difference and take the absolute value to avoid negative numbers
-  Duration diff = now.difference(postDate);
-  
-  // If the difference is negative or very small, just say "Just now"
-  if (diff.isNegative || diff.inSeconds < 60) {
-    return "Just now";
-  }
-
-  if (diff.inMinutes < 60) {
-    return "${diff.inMinutes} mins ago";
-  } else if (diff.inHours < 24) {
-    return "${diff.inHours} hours ago";
-  } else if (diff.inDays < 7) {
-    return "${diff.inDays} days ago";
-  } else {
-    // For older posts, show the date
-    return "${postDate.day}/${postDate.month}/${postDate.year}";
-  }
-}
 
   Widget _buildWelcomeHeader() {
     return Padding(
@@ -579,48 +551,103 @@ class _AnnouncementCard extends StatelessWidget {
 
   const _AnnouncementCard({required this.a});
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: _white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 14, offset: const Offset(0, 4))],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 4,
-            height: 60,
-            decoration: BoxDecoration(color: a.typeColor, borderRadius: BorderRadius.circular(2)),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+  // This helper function builds the "Maximized" view
+  void _showFullAnnouncement(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true, // Allows it to expand for long text
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40, height: 4, 
+                decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(color: a.typeColor.withOpacity(0.10), borderRadius: BorderRadius.circular(20)),
-                      child: Text(a.type, style: TextStyle(fontSize: 10, color: a.typeColor, fontWeight: FontWeight.w700)),
-                    ),
-                    const Spacer(),
-                    Text(a.date, style: const TextStyle(fontSize: 11, color: _textGrey)),
-                  ],
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(color: a.typeColor.withOpacity(0.10), borderRadius: BorderRadius.circular(20)),
+                  child: Text(a.type.toUpperCase(), style: TextStyle(fontSize: 11, color: a.typeColor, fontWeight: FontWeight.bold)),
                 ),
-                const SizedBox(height: 6),
-                Text(a.title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _textDark)),
-                const SizedBox(height: 4),
-                Text(a.body, style: const TextStyle(fontSize: 12, color: _textGrey, height: 1.5), maxLines: 2, overflow: TextOverflow.ellipsis),
+                const Spacer(),
+                Text(a.date, style: const TextStyle(fontSize: 12, color: Colors.grey)),
               ],
             ),
-          ),
-        ],
+            const SizedBox(height: 16),
+            Text(a.title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF1A1D1E))),
+            const SizedBox(height: 12),
+            const Divider(),
+            const SizedBox(height: 12),
+            SingleChildScrollView(
+              child: Text(
+                a.body,
+                style: const TextStyle(fontSize: 15, color: Color(0xFF4A4D4E), height: 1.6),
+              ),
+            ),
+            const SizedBox(height: 40), // Spacing at the bottom
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => _showFullAnnouncement(context), // <--- TAP TO MAXIMIZE
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 14, offset: const Offset(0, 4))],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 4,
+              height: 60,
+              decoration: BoxDecoration(color: a.typeColor, borderRadius: BorderRadius.circular(2)),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(color: a.typeColor.withOpacity(0.10), borderRadius: BorderRadius.circular(20)),
+                        child: Text(a.type, style: TextStyle(fontSize: 10, color: a.typeColor, fontWeight: FontWeight.w700)),
+                      ),
+                      const Spacer(),
+                      Text(a.date, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(a.title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF1A1D1E))),
+                  const SizedBox(height: 4),
+                  Text(a.body, style: const TextStyle(fontSize: 12, color: Colors.grey, height: 1.5), maxLines: 2, overflow: TextOverflow.ellipsis),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -693,4 +720,97 @@ class _NavItem extends StatelessWidget {
           ],
         ),
       );
+}
+
+// Helper to keep your UI colors consistent with your design
+Color _getLiveTypeColor(String? type) {
+  switch (type) {
+    case 'Event': return const Color(0xFF8B5CF6);      // Violet
+    case 'Important': return const Color(0xFFEC4899);  // Pink
+    case 'News': return const Color(0xFF3B82F6);       // Blue
+    case 'Reminder': return const Color(0xFF059669);   // Green
+    default: return Colors.blueGrey;
+  }
+}
+
+// Helper to turn database timestamps into readable strings
+String _formatTimeAgo(String? timestamp) {
+  if (timestamp == null) return "Just now";
+  
+  // Parse the UTC time from Supabase correctly
+  DateTime postDate = DateTime.parse(timestamp).toLocal();
+  DateTime now = DateTime.now();
+  
+  // Use difference and take the absolute value to avoid negative numbers
+  Duration diff = now.difference(postDate);
+  
+  // If the difference is negative or very small, just say "Just now"
+  if (diff.isNegative || diff.inSeconds < 60) {
+    return "Just now";
+  }
+
+  if (diff.inMinutes < 60) {
+    return "${diff.inMinutes} mins ago";
+  } else if (diff.inHours < 24) {
+    return "${diff.inHours} hours ago";
+  } else if (diff.inDays < 7) {
+    return "${diff.inDays} days ago";
+  } else {
+    // For older posts, show the date
+    return "${postDate.day}/${postDate.month}/${postDate.year}";
+  }
+}
+
+class AllAnnouncementsScreen extends StatelessWidget {
+  const AllAnnouncementsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FE), 
+      appBar: AppBar(
+        title: const Text('University Announcements', 
+          style: TextStyle(color: _textDark, fontWeight: FontWeight.bold, fontSize: 18)),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _textDark, size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: StreamBuilder<List<Map<String, dynamic>>>(
+        stream: Supabase.instance.client
+            .from('university_announcements')
+            .stream(primaryKey: ['id'])
+            .order('created_at', ascending: false),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator(color: _blue));
+          }
+
+          final liveData = snapshot.data ?? [];
+          if (liveData.isEmpty) {
+            return const Center(child: Text("No announcements found."));
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: liveData.length,
+            itemBuilder: (context, index) {
+              final item = liveData[index];
+              final a = _Announcement(
+                title: item['title'] ?? 'Untitled',
+                body: item['description'] ?? '',
+                date: _formatTimeAgo(item['created_at']),
+                type: item['type'] ?? 'News',
+                typeColor: _getLiveTypeColor(item['type']),
+              );
+              return _AnnouncementCard(a: a);
+            },
+          );
+        },
+      ),
+    );
+  }
 }

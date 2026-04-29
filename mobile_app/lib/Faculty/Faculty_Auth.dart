@@ -17,7 +17,7 @@ const _fieldBg  = Color(0xFFF8FAFC);
 final _db = Supabase.instance.client;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// COMPANY AUTH SCREEN
+// Faculty AUTH SCREEN
 // ─────────────────────────────────────────────────────────────────────────────
 class FacultyAuthScreen extends StatefulWidget {
   const FacultyAuthScreen({super.key});
@@ -225,7 +225,6 @@ class _FacultyLoginCardState extends State<_FacultyLoginCard> {
     setState(() => _isLoading = true);
 
     try {
-      // 1. Point to your Faculty table instead of Company
       final data = await _db
           .from('faculty_profile') 
           .select()
@@ -257,7 +256,6 @@ class _FacultyLoginCardState extends State<_FacultyLoginCard> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            // 3. Navigate to Faculty Home instead of Company Home
             builder: (_) => FacultyHomePage(facultyId: data['id'] as int),
           ),
         );

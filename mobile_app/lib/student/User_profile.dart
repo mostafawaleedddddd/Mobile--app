@@ -6,7 +6,7 @@ import 'StudentHome.dart';
 import 'survey.dart';
 import 'internships_page.dart';
 import 'Login_Signup.dart';
-import 'app_session.dart';
+import '../app_session.dart';
 import 'UserRole.dart';
 
 // ─── COLORS ────────────────────────────

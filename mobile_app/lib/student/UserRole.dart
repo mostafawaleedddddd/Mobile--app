@@ -1,8 +1,8 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'Login_SignUp.dart'; // your existing AuthScreen lives here
-import 'company_auth.dart';
-import 'Faculty_Auth.dart';
+import 'Login_SignUp.dart'; 
+import '/Company/company_auth.dart';
+import '/Faculty/Faculty_Auth.dart';
 // ─────────────────────────────────────────────
 // COLORS
 // ─────────────────────────────────────────────

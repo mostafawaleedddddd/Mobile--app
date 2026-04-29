@@ -1,9 +1,9 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'StudentHome.dart';
-import 'User_profile.dart';
-import 'app_session.dart';
+import '/student/StudentHome.dart';
+import '/student/User_profile.dart';
+import '../app_session.dart';
 
 // ─── COLORS ────────────────────────────
 const _blue     = Color(0xFF3B82F6);
@@ -397,7 +397,7 @@ class _RegisterCardState extends State<_RegisterCard> {
   final _phoneCtrl   = TextEditingController();
   final _passCtrl    = TextEditingController();
   final _confirmCtrl = TextEditingController();
-  String _type       = 'Student';
+  
   bool _isLoading    = false;
 
   @override
@@ -416,7 +416,7 @@ class _RegisterCardState extends State<_RegisterCard> {
     setState(() => _isLoading = true);
 
     try {
-      // insert into DB and get back the new row with its id
+      // Logic: Hard-coded 'Student' since this page is for students only
       final inserted = await Supabase.instance.client
           .from('User_profile')
           .insert({
@@ -424,7 +424,7 @@ class _RegisterCardState extends State<_RegisterCard> {
             'email':        _emailCtrl.text.trim(),
             'phone':        _phoneCtrl.text.trim(),
             'password':     _passCtrl.text,
-            'account_type': _type,
+            'account_type': 'Student', 
           })
           .select()
           .single();
@@ -468,32 +468,10 @@ class _RegisterCardState extends State<_RegisterCard> {
                     fontWeight: FontWeight.w800,
                     color: _textDark)),
             const SizedBox(height: 4),
-            const Text('Create your account to get started.',
+            const Text('Create your student account to get started.',
                 style: TextStyle(fontSize: 13, color: _textGrey)),
 
-            const SizedBox(height: 20),
-
-            _Label('Account type'),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                _RadioOption(
-                  label: 'Student',
-                  value: 'Student',
-                  groupValue: _type,
-                  onChanged: (v) => setState(() => _type = v),
-                ),
-                const SizedBox(width: 24),
-                _RadioOption(
-                  label: 'Company',
-                  value: 'Company',
-                  groupValue: _type,
-                  onChanged: (v) => setState(() => _type = v),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 16),
+            const SizedBox(height: 24), // Balanced spacing
 
             _Label('Full name'),
             const SizedBox(height: 6),
@@ -611,56 +589,6 @@ class _RegisterCardState extends State<_RegisterCard> {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-// ─── RADIO OPTION ──────────────────────
-class _RadioOption extends StatelessWidget {
-  final String label;
-  final String value;
-  final String groupValue;
-  final ValueChanged<String> onChanged;
-
-  const _RadioOption({
-    required this.label,
-    required this.value,
-    required this.groupValue,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final selected = value == groupValue;
-    return GestureDetector(
-      onTap: () => onChanged(value),
-      behavior: HitTestBehavior.opaque,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            width: 20,
-            height: 20,
-            child: Radio<String>(
-              value: value,
-              groupValue: groupValue,
-              onChanged: (v) => onChanged(v!),
-              activeColor: _blue,
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              visualDensity: const VisualDensity(
-                horizontal: VisualDensity.minimumDensity,
-                vertical: VisualDensity.minimumDensity,
-              ),
-            ),
-          ),
-          const SizedBox(width: 6),
-          Text(label,
-              style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: selected ? _blue : _textGrey)),
-        ],
       ),
     );
   }

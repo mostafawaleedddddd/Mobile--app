@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'Faculty_Model.dart';
+// import 'Faculty_Model.dart';
 import 'Faculty_Session.dart';
-import 'Faculty_Auth.dart';
+// import 'Faculty_Auth.dart';
 // Assuming these are your existing imports for navigation
 // import 'package:your_app/user_role_screen.dart'; 
 
@@ -206,8 +206,6 @@ class _PostAnnouncementPageState extends State<PostAnnouncementPage> {
     setState(() => _isPosting = true);
 
     try {
-      // Fix: Changed 'tag' to 'type' to match your schema
-      // Fix: Included 'faculty_id' as required by your schema
       await Supabase.instance.client.from('university_announcements').insert({
         'faculty_id': widget.facultyId, 
         'title': _titleController.text.trim(),
