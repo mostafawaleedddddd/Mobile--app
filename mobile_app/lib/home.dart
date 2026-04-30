@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'onboarding_page2.dart';
+import 'student/onboarding_page2.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 // ── Page 1: Internship Seeker ──────────
 Future<void> main() async {                    
