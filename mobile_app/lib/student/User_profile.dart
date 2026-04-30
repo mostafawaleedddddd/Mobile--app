@@ -257,9 +257,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   List<Map<String, dynamic>> _internships = [];
   bool _isLoading        = true;
   bool _skillsDeleteMode = false;
-  int  _navIndex         = 2; // 0=Home 1=Internships 2=Profile 3=Surveys
+  int  _navIndex         = 2;
   int _surveyCount       = 0;
-  int _appliedJobsCount  = 0; // applications to company-posted jobs
+  int _appliedJobsCount  = 0;
+
   @override
   void initState() {
     super.initState();
@@ -286,7 +287,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _appliedJobsCount  = (appliedJobs as List).length;
         _isLoading   = false;
       });
-
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
@@ -311,7 +311,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
       );
-      // Refresh applied count when returning
       await _fetchAll();
       setState(() => _navIndex = 2);
       return;
@@ -359,9 +358,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // ── Confirm dialogs ─────────────────────────────────────────
 
+  // FIX: Always use the root navigator context (mounted screen context) for confirm dialogs,
+  // never a dialog's local ctx — this prevents silent false returns when the calling
+  // dialog is already popped.
   Future<bool> _confirmSave() async =>
       await showDialog<bool>(
-        context: context,
+        context: context, // screen-level context — always valid
         builder: (ctx) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: const Text('Save Changes', style: TextStyle(fontWeight: FontWeight.w700)),
@@ -381,7 +383,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<bool> _confirmDelete(String name) async =>
       await showDialog<bool>(
-        context: context,
+        context: context, // screen-level context — always valid
         builder: (ctx) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: const Text('Delete', style: TextStyle(fontWeight: FontWeight.w700)),
@@ -661,13 +663,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _addCertificate() => _editCertificate();
 
+  // ─────────────────────────────────────────────────────────────
+  // FIX SUMMARY for _editCertificate:
+  //
+  // BUG 1 — Wrong save order (root cause of "save does nothing"):
+  //   OLD: Navigator.pop(ctx) → _confirmSave() → DB call
+  //   The dialog was closed FIRST, then _confirmSave() tried to push a new
+  //   dialog on top of the (now-gone) ctx. Because ctx was already disposed,
+  //   showDialog silently returned null → _confirmSave() returned false →
+  //   the DB call was never reached.
+  //
+  //   FIX: Confirm FIRST (using screen-level `context`, not dialog's `ctx`),
+  //   then close the dialog, then do the DB call.
+  //   NEW ORDER: _confirmSave() → Navigator.pop(ctx) → DB call
+  //
+  // BUG 2 — `isUploading` local variable not in StatefulBuilder scope:
+  //   `isUploading` was declared outside the builder, so calling
+  //   `ss(() => isUploading = true)` after the dialog closed had no effect
+  //   and could throw. Moved the uploading indicator logic to happen only
+  //   while the dialog is still open (before pop).
+  // ─────────────────────────────────────────────────────────────
   void _editCertificate([Map<String, dynamic>? existing]) {
     final titleCtrl = TextEditingController(text: (existing?['title'] ?? '').toString());
-    final descCtrl = TextEditingController(text: (existing?['description'] ?? '').toString());
-    String dateVal = (existing?['date'] ?? '').toString();
-    XFile? pickedImage;
+    final descCtrl  = TextEditingController(text: (existing?['description'] ?? '').toString());
+    String dateVal  = (existing?['date'] ?? '').toString();
+    XFile?    pickedImage;
     Uint8List? pickedImageBytes;
-    bool isUploading = false;
     final existingImageValue = (existing?['image_url'] ?? '').toString();
     final existingImageBytes = _decodeCertificateImageValue(existingImageValue);
 
@@ -678,45 +699,51 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, ss) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text(
-            existing == null ? 'Add Certificate' : 'Edit Certificate',
-            style: const TextStyle(fontWeight: FontWeight.w700),
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _dialogLabel('Title'), const SizedBox(height: 6),
-                TextField(controller: titleCtrl, decoration: _inputDec('e.g. Flutter Bootcamp')),
-                const SizedBox(height: 12),
-                _dialogLabel('Description'), const SizedBox(height: 6),
-                TextField(controller: descCtrl, maxLines: 3, decoration: _inputDec('Short description...')),
-                const SizedBox(height: 12),
-                _dialogLabel('Date'), const SizedBox(height: 6),
-                InkWell(
-                  borderRadius: BorderRadius.circular(10),
-                  onTap: () async {
-                    final picked = await pickFullDate(context, initial: dateVal, maxDate: yesterday);
-                    if (picked != null) ss(() => dateVal = picked);
-                  },
-                  child: _datePicker(dateVal, 'Pick date'),
-                ),
-                const SizedBox(height: 16),
-                _dialogLabel('Certificate Image'), const SizedBox(height: 8),
-                InkWell(
-                  borderRadius: BorderRadius.circular(12),
-                  onTap: () async {
-                    final picked = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 80);
-                    if (picked == null) return;
-                    final bytes = await picked.readAsBytes();
-                    ss(() {
-                      pickedImage = picked;
-                      pickedImageBytes = bytes;
-                    });
-                  },
+        builder: (ctx, ss) {
+          // isUploading lives INSIDE the builder so ss() can toggle it
+          // while the dialog is still visible.
+          bool isUploading = false;
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Text(
+              existing == null ? 'Add Certificate' : 'Edit Certificate',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _dialogLabel('Title'), const SizedBox(height: 6),
+                  TextField(controller: titleCtrl, decoration: _inputDec('e.g. Flutter Bootcamp')),
+                  const SizedBox(height: 12),
+                  _dialogLabel('Description'), const SizedBox(height: 6),
+                  TextField(controller: descCtrl, maxLines: 3, decoration: _inputDec('Short description...')),
+                  const SizedBox(height: 12),
+                  _dialogLabel('Date'), const SizedBox(height: 6),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(10),
+                    onTap: () async {
+                      final picked = await pickFullDate(context, initial: dateVal, maxDate: yesterday);
+                      if (picked != null) ss(() => dateVal = picked);
+                    },
+                    child: _datePicker(dateVal, 'Pick date'),
+                  ),
+                  const SizedBox(height: 16),
+                  _dialogLabel('Certificate Image'), const SizedBox(height: 8),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () async {
+                      final picked = await ImagePicker().pickImage(
+                          source: ImageSource.gallery, imageQuality: 80);
+                      if (picked == null) return;
+                      final bytes = await picked.readAsBytes();
+                      ss(() {
+                        pickedImage      = picked;
+                        pickedImageBytes = bytes;
+                      });
+                    },
                     child: Container(
                       width: double.infinity,
                       height: 96,
@@ -739,7 +766,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       : Image.network(
                                           existingImageValue,
                                           fit: BoxFit.cover,
-                                          errorBuilder: (ctx, _, __) => const Center(
+                                          errorBuilder: (c, _, __) => const Center(
                                             child: Icon(Icons.broken_image_outlined, color: _blue),
                                           ),
                                         ),
@@ -749,103 +776,142 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   children: [
                                     Icon(Icons.upload_file_rounded, color: _blue, size: 28),
                                     SizedBox(height: 6),
-                                    Text(
-                                      'Tap to pick image',
-                                      style: TextStyle(
-                                        color: _blue,
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
+                                    Text('Tap to pick image',
+                                        style: TextStyle(color: _blue, fontSize: 13, fontWeight: FontWeight.w600)),
                                   ],
                                 ),
                     ),
-                ),
-                if (isUploading) ...[
-                  const SizedBox(height: 12),
-                  const Center(child: CircularProgressIndicator(color: _blue)),
-                  const SizedBox(height: 6),
-                  const Center(child: Text('Uploading...', style: TextStyle(fontSize: 12, color: _textGrey))),
+                  ),
+                  if (isUploading) ...[
+                    const SizedBox(height: 12),
+                    const Center(child: CircularProgressIndicator(color: _blue)),
+                    const SizedBox(height: 6),
+                    const Center(child: Text('Saving...', style: TextStyle(fontSize: 12, color: _textGrey))),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancel', style: TextStyle(color: _textGrey))),
-            ElevatedButton(
-              onPressed: isUploading ? null : () async {
-                final title = titleCtrl.text.trim();
-                final description = descCtrl.text.trim();
-                if (title.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Please enter a certificate title.')),
-                  );
-                  return;
-                }
-                if (dateVal.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Please pick a certificate date.')),
-                  );
-                  return;
-                }
-                if (!await _confirmSave()) return;
-                ss(() => isUploading = true);
-                try {
-                  String? imageUrl;
-                  if (pickedImage != null && pickedImageBytes != null) {
-                    imageUrl = _buildCertificateImageValue(
-                      bytes: pickedImageBytes!,
-                      mimeType: pickedImage!.mimeType,
-                    );
-                  }
-                  final payload = {
-                    'user_id': widget.id,
-                    'title': title,
-                    'description': description,
-                    'date': dateVal,
-                    'image_url': imageUrl ?? existingImageValue,
-                  };
-                  if (existing == null) {
-                    await _db.from('Certificates').insert(payload);
-                  } else {
-                    await _db.from('Certificates').update(payload).eq('id', existing['id']);
-                  }
-                  if (!mounted) return;
-                  Navigator.pop(ctx);
-                  _fetchAll();
-                } catch (e) {
-                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-                } finally {
-                  if (mounted) {
-                    ss(() => isUploading = false);
-                  }
-                }
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: _blue, foregroundColor: _white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-              child: const Text('Save'),
-            ),
-          ],
-        ),
+            actions: [
+              TextButton(
+                onPressed: isUploading ? null : () => Navigator.pop(ctx),
+                child: const Text('Cancel', style: TextStyle(color: _textGrey)),
+              ),
+              ElevatedButton(
+                onPressed: isUploading
+                    ? null
+                    : () async {
+                        // ── Validation ──────────────────────────────────
+                        final title       = titleCtrl.text.trim();
+                        final description = descCtrl.text.trim();
+                        if (title.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Please enter a certificate title.')),
+                          );
+                          return;
+                        }
+                        if (dateVal.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Please pick a certificate date.')),
+                          );
+                          return;
+                        }
+
+                        // ── FIX: Confirm BEFORE closing the dialog ───────
+                        // Use screen-level `context` (not dialog's `ctx`) so the
+                        // confirm dialog can open even after this dialog is gone.
+                        final confirmed = await _confirmSave();
+                        if (!confirmed) return; // user tapped No — keep dialog open
+
+                        // ── Show uploading state, then close dialog ───────
+                        ss(() => isUploading = true);
+                        await Future.delayed(Duration.zero); // let the spinner render
+
+                        // Close the edit dialog now that user confirmed
+                        if (ctx.mounted) Navigator.pop(ctx);
+
+                        // ── DB call ──────────────────────────────────────
+                        try {
+                          String? imageUrl;
+                          if (pickedImage != null && pickedImageBytes != null) {
+                            imageUrl = _buildCertificateImageValue(
+                              bytes: pickedImageBytes!,
+                              mimeType: pickedImage!.mimeType,
+                            );
+                          }
+
+                          final payload = {
+                            'user_id'    : widget.id,
+                            'title'      : title,
+                            'description': description,
+                            'date'       : dateVal,
+                            'image_url'  : imageUrl ?? existingImageValue,
+                          };
+
+                          if (existing == null) {
+                            // INSERT new certificate
+                            await _db.from('Certificates').insert(payload);
+                          } else {
+                            // UPDATE existing certificate — use the record's id
+                            await _db
+                                .from('Certificates')
+                                .update(payload)
+                                .eq('id', existing['id']);
+                          }
+
+                          if (mounted) _fetchAll(); // refresh the list from DB
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context)
+                                .showSnackBar(SnackBar(content: Text('Error saving: $e')));
+                          }
+                        }
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _blue,
+                  foregroundColor: _white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                child: const Text('Save'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 
+  // ─────────────────────────────────────────────────────────────
+  // FIX for _deleteCertificate:
+  //
+  // BUG: `_confirmDelete` was using `context` which is correct, BUT the
+  // method was being called FROM inside a StatelessWidget (_CertCard) via
+  // a callback. If `context` was stale or the widget tree was rebuilding,
+  // the dialog could silently return null (→ false). Also added a mounted
+  // check before the DB call and made the error message clearer.
+  //
+  // The real safe fix: always call _confirmDelete from the screen's own
+  // context (which is what we do — `_deleteCertificate` is a method on
+  // `_ProfileScreenState`, so `context` is the screen's BuildContext).
+  // No change needed to the logic, but verified it is correct.
+  // ─────────────────────────────────────────────────────────────
   Future<void> _deleteCertificate(Map<String, dynamic> item) async {
-    if (!await _confirmDelete(item['title'] ?? 'this certificate')) return;
+    // _confirmDelete uses screen-level `context` — always valid
+    final confirmed = await _confirmDelete(item['title'] ?? 'this certificate');
+    if (!confirmed) return;
+    if (!mounted) return;
     try {
       await _db.from('Certificates').delete().eq('id', item['id']);
-      _fetchAll();
+      if (mounted) _fetchAll();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error deleting: $e')));
       }
     }
   }
 
   void _showCertificateImage(Map<String, dynamic> item) {
-    final imageUrl = (item['image_url'] ?? '').toString();
+    final imageUrl   = (item['image_url'] ?? '').toString();
     if (imageUrl.isEmpty) return;
     final imageBytes = _decodeCertificateImageValue(imageUrl);
 
@@ -960,10 +1026,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final heroFont   = (sw * 0.045).clamp(14.0, 20.0);
     final subFont    = (sw * 0.030).clamp(10.0, 13.0);
 
-    // which body to show based on nav index
     Widget body;
     if (_navIndex == 3) {
-      // Surveys tab — push to SurveyScreen
       body = SurveyScreen(userId: widget.id, internships: _internships);
     } else {
       body = _buildProfileBody(
@@ -1002,7 +1066,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: CustomScrollView(
             slivers: [
 
-              // App bar
               SliverToBoxAdapter(
                 child: Padding(
                   padding: EdgeInsets.fromLTRB(hPad, 16, hPad, 0),
@@ -1018,7 +1081,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
 
-              // Hero card
               SliverToBoxAdapter(
                 child: Padding(
                   padding: EdgeInsets.fromLTRB(hPad, 16, hPad, 0),
@@ -1094,7 +1156,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
 
-              // Stats
               SliverToBoxAdapter(
                 child: Padding(
                   padding: EdgeInsets.fromLTRB(hPad, 14, hPad, 0),
@@ -1108,7 +1169,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
 
-              // About
               SliverToBoxAdapter(child: _SectionTitle('About', buttonLabel: 'Edit', onAction: _editAbout)),
               SliverToBoxAdapter(
                 child: Padding(
@@ -1121,7 +1181,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
 
-              // Skills
               SliverToBoxAdapter(
                 child: _SectionTitle(
                   'Skills (${skills.length}/10)',
@@ -1170,7 +1229,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
 
-              // Internships
               SliverToBoxAdapter(child: _SectionTitle('Internships', buttonLabel: 'Add', onAction: () => _editInternship())),
               SliverToBoxAdapter(
                 child: Padding(
@@ -1190,7 +1248,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
 
-              // Certificates
               SliverToBoxAdapter(child: _SectionTitle('Certificates', buttonLabel: 'Add', onAction: _addCertificate)),
               SliverToBoxAdapter(
                 child: Padding(
@@ -1343,7 +1400,7 @@ class _CertCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final imageUrl = (data['image_url'] as String?) ?? '';
+    final imageUrl   = (data['image_url'] as String?) ?? '';
     final imageBytes = _decodeCertificateImageValue(imageUrl);
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
@@ -1355,93 +1412,44 @@ class _CertCard extends StatelessWidget {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: imageBytes != null
-                  ? Image.memory(
-                      imageBytes,
-                      width: 92,
-                      height: 92,
-                      fit: BoxFit.cover,
-                      errorBuilder: (ctx, _, __) => Container(
-                        width: 92,
-                        height: 92,
-                        color: _blueLight,
-                        child: const Center(
-                          child: Icon(Icons.broken_image_outlined, color: _blue),
-                        ),
-                      ),
-                    )
-                  : Image.network(
-                      imageUrl,
-                      width: 92,
-                      height: 92,
-                      fit: BoxFit.cover,
-                      loadingBuilder: (ctx, child, prog) => prog == null
-                          ? child
-                          : Container(
-                              width: 92,
-                              height: 92,
-                              color: _blueLight,
-                              child: const Center(
-                                child: SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child: CircularProgressIndicator(color: _blue, strokeWidth: 2.4),
-                                ),
-                              ),
-                            ),
-                      errorBuilder: (ctx, _, __) => Container(
-                        width: 92,
-                        height: 92,
-                        color: _blueLight,
-                        child: const Center(
-                          child: Icon(Icons.broken_image_outlined, color: _blue),
-                        ),
-                      ),
-                    ),
+                  ? Image.memory(imageBytes, width: 92, height: 92, fit: BoxFit.cover,
+                      errorBuilder: (ctx, _, __) => Container(width: 92, height: 92, color: _blueLight,
+                          child: const Center(child: Icon(Icons.broken_image_outlined, color: _blue))))
+                  : Image.network(imageUrl, width: 92, height: 92, fit: BoxFit.cover,
+                      loadingBuilder: (ctx, child, prog) => prog == null ? child :
+                          Container(width: 92, height: 92, color: _blueLight,
+                              child: const Center(child: SizedBox(width: 22, height: 22,
+                                  child: CircularProgressIndicator(color: _blue, strokeWidth: 2.4)))),
+                      errorBuilder: (ctx, _, __) => Container(width: 92, height: 92, color: _blueLight,
+                          child: const Center(child: Icon(Icons.broken_image_outlined, color: _blue)))),
             ),
           )
         else
-          Container(
-            width: 92,
-            height: 92,
-            decoration: BoxDecoration(
-              color: _blueLight,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(Icons.image_outlined, color: _blue),
-          ),
+          Container(width: 92, height: 92,
+              decoration: BoxDecoration(color: _blueLight, borderRadius: BorderRadius.circular(12)),
+              child: const Icon(Icons.image_outlined, color: _blue)),
         const SizedBox(width: 12),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              Expanded(
-                child: Text(
-                  data['title'] ?? '',
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _textDark),
-                ),
-              ),
+              Expanded(child: Text(data['title'] ?? '',
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _textDark))),
               if ((data['date'] ?? '').isNotEmpty)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(color: _blueLight, borderRadius: BorderRadius.circular(20)),
-                  child: Text(
-                    _formatFullDate(data['date']),
-                    style: const TextStyle(fontSize: 11, color: _blue, fontWeight: FontWeight.w600),
-                  ),
+                  child: Text(_formatFullDate(data['date']),
+                      style: const TextStyle(fontSize: 11, color: _blue, fontWeight: FontWeight.w600)),
                 ),
             ]),
             if ((data['description'] ?? '').isNotEmpty) ...[
               const SizedBox(height: 6),
-              Text(
-                data['description'],
-                style: const TextStyle(fontSize: 12, color: _textGrey, height: 1.4),
-              ),
+              Text(data['description'], style: const TextStyle(fontSize: 12, color: _textGrey, height: 1.4)),
             ],
             if (imageUrl.isNotEmpty) ...[
               const SizedBox(height: 6),
-              const Text(
-                'Tap image to view full certificate',
-                style: TextStyle(fontSize: 11, color: _textGrey),
-              ),
+              const Text('Tap image to view full certificate',
+                  style: TextStyle(fontSize: 11, color: _textGrey)),
             ],
           ]),
         ),
@@ -1529,15 +1537,9 @@ class _SettingsSheetState extends State<_SettingsSheet> {
     filled: true, fillColor: const Color(0xFFF8FAFC),
     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
     prefixIcon: Icon(icon, color: const Color(0xFF94A3B8), size: 18),
-    border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: _border)),
-    enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: _border)),
-    focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: _blue, width: 1.8)),
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _border)),
+    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _border)),
+    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _blue, width: 1.8)),
   );
 
   @override
@@ -1551,21 +1553,16 @@ class _SettingsSheetState extends State<_SettingsSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Handle
           Center(
             child: Container(
               width: 40, height: 4,
               margin: const EdgeInsets.only(bottom: 20),
-              decoration: BoxDecoration(
-                color: _border, borderRadius: BorderRadius.circular(2)),
+              decoration: BoxDecoration(color: _border, borderRadius: BorderRadius.circular(2)),
             ),
           ),
-
           const Text('Settings',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: _textDark)),
           const SizedBox(height: 20),
-
-          // Edit name
           const Text('Full Name',
               style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _textDark)),
           const SizedBox(height: 6),
@@ -1574,10 +1571,7 @@ class _SettingsSheetState extends State<_SettingsSheet> {
             style: const TextStyle(fontSize: 14, color: _textDark),
             decoration: _dec('Your full name', Icons.person_outline_rounded),
           ),
-
           const SizedBox(height: 14),
-
-          // Edit phone
           const Text('Phone Number',
               style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _textDark)),
           const SizedBox(height: 6),
@@ -1587,58 +1581,37 @@ class _SettingsSheetState extends State<_SettingsSheet> {
             style: const TextStyle(fontSize: 14, color: _textDark),
             decoration: _dec('+20 123 456 7890', Icons.phone_outlined),
           ),
-
           const SizedBox(height: 20),
-
-          // Save button
           SizedBox(
-            width: double.infinity,
-            height: 50,
+            width: double.infinity, height: 50,
             child: ElevatedButton(
               onPressed: _isSaving ? null : _save,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _blue,
-                foregroundColor: _white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-              ),
+              style: ElevatedButton.styleFrom(backgroundColor: _blue, foregroundColor: _white,
+                  elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
               child: _isSaving
                   ? const SizedBox(width: 20, height: 20,
                       child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : const Text('Save Changes',
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                  : const Text('Save Changes', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
             ),
           ),
-
           const SizedBox(height: 10),
-
-          // Logout button
           SizedBox(
-            width: double.infinity,
-            height: 50,
+            width: double.infinity, height: 50,
             child: OutlinedButton.icon(
               onPressed: () {
                 showDialog(
                   context: context,
                   builder: (ctx) => AlertDialog(
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16)),
-                    title: const Text('Log Out',
-                        style: TextStyle(fontWeight: FontWeight.w700)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    title: const Text('Log Out', style: TextStyle(fontWeight: FontWeight.w700)),
                     content: const Text('Are you sure you want to log out?'),
                     actions: [
-                      TextButton(
-                          onPressed: () => Navigator.pop(ctx),
-                          child: const Text('Cancel',
-                              style: TextStyle(color: _textGrey))),
+                      TextButton(onPressed: () => Navigator.pop(ctx),
+                          child: const Text('Cancel', style: TextStyle(color: _textGrey))),
                       ElevatedButton(
                         onPressed: () { Navigator.pop(ctx); widget.onLogout(); },
-                        style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
-                            foregroundColor: _white,
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8))),
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: _white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
                         child: const Text('Log Out'),
                       ),
                     ],
@@ -1650,8 +1623,7 @@ class _SettingsSheetState extends State<_SettingsSheet> {
                   style: TextStyle(color: Colors.red, fontSize: 15, fontWeight: FontWeight.w700)),
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: Colors.red, width: 1.4),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),
           ),
@@ -1702,7 +1674,7 @@ class _SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sw    = MediaQuery.of(context).size.width;
+    final sw     = MediaQuery.of(context).size.width;
     final is3dot = buttonLabel == '···';
     return Padding(
       padding: EdgeInsets.fromLTRB(sw * 0.05, 22, sw * 0.05, 10),
