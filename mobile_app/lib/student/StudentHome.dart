@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../app_session.dart';
 import 'User_profile.dart';
 import 'survey.dart';
+import 'interview_prep.dart';
 
 void main() => runApp(const MyApp());
 
@@ -46,18 +47,17 @@ const _tabStatuses = ['', 'pending', 'interview', 'rejected'];
 
 String _getInitials(String name) => name.trim().split(' ').where((e) => e.isNotEmpty).take(2).map((e) => e[0].toUpperCase()).join();
 
-final _aiTools = [
-  _AiTool(title: 'Resume Analyzer', subtitle: 'Get AI feedback on your CV', icon: Icons.description_outlined, grad: [Color(0xFF7C3AED), Color(0xFF4F46E5)]),
-  _AiTool(title: 'AI Career Chat', subtitle: 'Chat with your career assistant', icon: Icons.smart_toy_outlined, grad: [Color(0xFFDB2777), Color(0xFF9333EA)]),
-  _AiTool(title: 'Interview Prep', subtitle: 'Practice mock interviews', icon: Icons.record_voice_over_outlined, grad: [Color(0xFF0284C7), Color(0xFF06B6D4)]),
+final _toolsToUse = [
+  _TooltoUse(title: 'Resume Analyzer', subtitle: 'Get AI feedback on your CV', icon: Icons.description_outlined, grad: [Color(0xFF7C3AED), Color(0xFF4F46E5)]),
+  _TooltoUse(title: 'Interview Prep', subtitle: 'Practice mock interviews', icon: Icons.record_voice_over_outlined, grad: [Color(0xFF0284C7), Color(0xFF06B6D4)]),
 ];
 
-class _AiTool {
+class _TooltoUse {
   final String title, subtitle;
   final IconData icon;
   final List<Color> grad;
 
-  const _AiTool({
+  const _TooltoUse({
     required this.title,
     required this.subtitle,
     required this.icon,
@@ -239,8 +239,8 @@ class _HomePageState extends State<HomePage> {
         SliverToBoxAdapter(child: _buildActivityTabs()),
         SliverToBoxAdapter(child: _buildSectionHeader('My Applications', 'View All', () {})),
         SliverToBoxAdapter(child: _buildApplicationsList()),
-        SliverToBoxAdapter(child: _buildSectionHeader('AI Tools', '', null)),
-        SliverToBoxAdapter(child: _buildAiTools()),
+        SliverToBoxAdapter(child: _buildSectionHeader('Tools to use', '', null)),
+        SliverToBoxAdapter(child: _buildToolsToUse()),
         SliverToBoxAdapter(
   child: _buildSectionHeader(
     'University Announcements', 
@@ -273,7 +273,6 @@ SliverToBoxAdapter(
         // This is the filter
         final previewData = liveData.take(3).toList();
         
-        // DEBUG: Check your console to see this number change to 3
         print("Total in DB: ${liveData.length} | Showing on Home: ${previewData.length}");
 
         if (previewData.isEmpty) {
@@ -430,16 +429,25 @@ SliverToBoxAdapter(
     );
   }
 
-  Widget _buildAiTools() {
+  Widget _buildToolsToUse() {
     return SizedBox(
       height: 140,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: _aiTools.length,
+        itemCount: _toolsToUse.length,
         itemBuilder: (_, i) {
-          final tool = _aiTools[i];
-          return _AiToolCard(tool: tool);
+          final tool = _toolsToUse[i];
+          return _TooltoUseCard(
+            tool: tool,
+            onTap: tool.title == 'Interview Prep'
+                ? () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const InterviewPrepScreen()),
+                    );
+                  }
+                : null,
+          );
         },
       ),
     );
@@ -511,36 +519,41 @@ class _ApplicationCard extends StatelessWidget {
   }
 }
 
-class _AiToolCard extends StatelessWidget {
-  final _AiTool tool;
+class _TooltoUseCard extends StatelessWidget {
+  final _TooltoUse tool;
+  final VoidCallback? onTap;
 
-  const _AiToolCard({required this.tool});
+  const _TooltoUseCard({required this.tool, this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 175,
-      margin: const EdgeInsets.only(right: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(colors: tool.grad, begin: Alignment.topLeft, end: Alignment.bottomRight),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: tool.grad.first.withOpacity(0.30), blurRadius: 20, offset: const Offset(0, 8))],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(color: Colors.white.withOpacity(0.20), borderRadius: BorderRadius.circular(12)),
-            child: Icon(tool.icon, color: _white, size: 20),
-          ),
-          const Spacer(),
-          Text(tool.title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: _white), overflow: TextOverflow.ellipsis),
-          const SizedBox(height: 3),
-          Text(tool.subtitle, style: TextStyle(fontSize: 10, color: Colors.white.withOpacity(0.75)), overflow: TextOverflow.ellipsis, maxLines: 2),
-        ],
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        width: 175,
+        margin: const EdgeInsets.only(right: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(colors: tool.grad, begin: Alignment.topLeft, end: Alignment.bottomRight),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [BoxShadow(color: tool.grad.first.withOpacity(0.30), blurRadius: 20, offset: const Offset(0, 8))],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(color: Colors.white.withOpacity(0.20), borderRadius: BorderRadius.circular(12)),
+              child: Icon(tool.icon, color: _white, size: 20),
+            ),
+            const Spacer(),
+            Text(tool.title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: _white), overflow: TextOverflow.ellipsis),
+            const SizedBox(height: 3),
+            Text(tool.subtitle, style: TextStyle(fontSize: 10, color: Colors.white.withOpacity(0.75)), overflow: TextOverflow.ellipsis, maxLines: 2),
+          ],
+        ),
       ),
     );
   }

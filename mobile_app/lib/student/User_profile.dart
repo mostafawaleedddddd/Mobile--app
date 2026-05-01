@@ -1,14 +1,17 @@
 import 'dart:convert';
+import 'dart:io' show File;
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'StudentHome.dart';
 import 'survey.dart';
 import 'internships_page.dart';
-import 'Login_Signup.dart';
 import '../app_session.dart';
 import 'UserRole.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 // ─── COLORS ────────────────────────────
 const _blue      = Color(0xFF3B82F6);
@@ -255,6 +258,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Map<String, dynamic>? _info;
   List<Map<String, dynamic>> _certs       = [];
   List<Map<String, dynamic>> _internships = [];
+  String _cvUrl = ''; 
   bool _isLoading        = true;
   bool _skillsDeleteMode = false;
   int  _navIndex         = 2;
@@ -283,6 +287,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _info        = infoList.isNotEmpty ? infoList.first : null;
         _certs       = List<Map<String, dynamic>>.from(certs);
         _internships = List<Map<String, dynamic>>.from(internships);
+        _cvUrl       = infoList.isNotEmpty ? (infoList.first['cv_url'] ?? '') : '';
         _surveyCount       = surveyes.length;
         _appliedJobsCount  = (appliedJobs as List).length;
         _isLoading   = false;
@@ -358,9 +363,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // ── Confirm dialogs ─────────────────────────────────────────
 
-  // FIX: Always use the root navigator context (mounted screen context) for confirm dialogs,
-  // never a dialog's local ctx — this prevents silent false returns when the calling
-  // dialog is already popped.
   Future<bool> _confirmSave() async =>
       await showDialog<bool>(
         context: context, // screen-level context — always valid
@@ -663,26 +665,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _addCertificate() => _editCertificate();
 
-  // ─────────────────────────────────────────────────────────────
-  // FIX SUMMARY for _editCertificate:
-  //
-  // BUG 1 — Wrong save order (root cause of "save does nothing"):
-  //   OLD: Navigator.pop(ctx) → _confirmSave() → DB call
-  //   The dialog was closed FIRST, then _confirmSave() tried to push a new
-  //   dialog on top of the (now-gone) ctx. Because ctx was already disposed,
-  //   showDialog silently returned null → _confirmSave() returned false →
-  //   the DB call was never reached.
-  //
-  //   FIX: Confirm FIRST (using screen-level `context`, not dialog's `ctx`),
-  //   then close the dialog, then do the DB call.
-  //   NEW ORDER: _confirmSave() → Navigator.pop(ctx) → DB call
-  //
-  // BUG 2 — `isUploading` local variable not in StatefulBuilder scope:
-  //   `isUploading` was declared outside the builder, so calling
-  //   `ss(() => isUploading = true)` after the dialog closed had no effect
-  //   and could throw. Moved the uploading indicator logic to happen only
-  //   while the dialog is still open (before pop).
-  // ─────────────────────────────────────────────────────────────
   void _editCertificate([Map<String, dynamic>? existing]) {
     final titleCtrl = TextEditingController(text: (existing?['title'] ?? '').toString());
     final descCtrl  = TextEditingController(text: (existing?['description'] ?? '').toString());
@@ -700,8 +682,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, ss) {
-          // isUploading lives INSIDE the builder so ss() can toggle it
-          // while the dialog is still visible.
           bool isUploading = false;
 
           return AlertDialog(
@@ -778,8 +758,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     SizedBox(height: 6),
                                     Text('Tap to pick image',
                                         style: TextStyle(color: _blue, fontSize: 13, fontWeight: FontWeight.w600)),
-                                  ],
-                                ),
+                                  ]),
                     ),
                   ),
                   if (isUploading) ...[
@@ -815,10 +794,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           );
                           return;
                         }
-
-                        // ── FIX: Confirm BEFORE closing the dialog ───────
-                        // Use screen-level `context` (not dialog's `ctx`) so the
-                        // confirm dialog can open even after this dialog is gone.
                         final confirmed = await _confirmSave();
                         if (!confirmed) return; // user tapped No — keep dialog open
 
@@ -880,20 +855,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // FIX for _deleteCertificate:
-  //
-  // BUG: `_confirmDelete` was using `context` which is correct, BUT the
-  // method was being called FROM inside a StatelessWidget (_CertCard) via
-  // a callback. If `context` was stale or the widget tree was rebuilding,
-  // the dialog could silently return null (→ false). Also added a mounted
-  // check before the DB call and made the error message clearer.
-  //
-  // The real safe fix: always call _confirmDelete from the screen's own
-  // context (which is what we do — `_deleteCertificate` is a method on
-  // `_ProfileScreenState`, so `context` is the screen's BuildContext).
-  // No change needed to the logic, but verified it is correct.
-  // ─────────────────────────────────────────────────────────────
   Future<void> _deleteCertificate(Map<String, dynamic> item) async {
     // _confirmDelete uses screen-level `context` — always valid
     final confirmed = await _confirmDelete(item['title'] ?? 'this certificate');
@@ -964,14 +925,121 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  // ── CV Upload ───────────────────────────────────────────────
+
+  Future<void> _uploadCv() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'doc', 'docx'],
+        allowMultiple: false,
+        withData: true, 
+      );
+
+      if (result == null || result.files.isEmpty) return;
+
+      final file = result.files.first;
+
+      // Show loading
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => const AlertDialog(
+          content: Row(children: [
+            CircularProgressIndicator(color: _blue),
+            SizedBox(width: 16),
+            Text('Uploading CV...'),
+          ]),
+        ),
+      );
+
+      final fileName = 'cv_${widget.id}_${DateTime.now().millisecondsSinceEpoch}.${file.extension}';
+
+      if (kIsWeb) {
+        // 1. Web Upload (uses bytes)
+        await _db.storage.from('CVs').uploadBinary(
+          fileName, 
+          file.bytes!,
+        );
+      } else {
+        // 2. Mobile Upload (uses path)
+        if (file.path == null) throw Exception('File path is null');
+        await _db.storage.from('CVs').upload(
+          fileName, 
+          File(file.path!),
+        );
+      }
+      
+      final cvUrl = _db.storage.from('CVs').getPublicUrl(fileName);
+
+      // Save to Database
+      if (_info == null) {
+        await _db.from('Profile_info').insert({
+          'user_id': widget.id, 
+          'cv_url': cvUrl,
+          'about': '',     
+          'skills': ''
+        });
+      } else {
+        await _db.from('Profile_info').update({'cv_url': cvUrl}).eq('user_id', widget.id);
+      }
+
+      if (!mounted) return;
+      Navigator.pop(context); // Close loading dialog
+
+      await _fetchAll();
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('CV uploaded successfully!'), backgroundColor: Colors.green),
+      );
+
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context); // Close loading dialog if open
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Upload failed: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  Future<void> _deleteCv() async {
+    if (!await _confirmDelete('your CV')) return;
+    try {
+      await _db.from('Profile_info').update({'cv_url': ''}).eq('user_id', widget.id);
+      await _fetchAll();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('CV deleted')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _viewCv() async {
+    if (_cvUrl.isEmpty) return;
+    final uri = Uri.parse(_cvUrl);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open CV')),
+        );
+      }
+    }
+  }
+
   // ── Shared helpers ───────────────────────────────────────────
 
   Widget _datePicker(String value, String placeholder) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-    decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: _border)),
     child: Row(children: [
       const Icon(Icons.calendar_month_outlined, size: 16, color: _blue),
       const SizedBox(width: 8),
@@ -1229,6 +1297,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
 
+              // Internships
               SliverToBoxAdapter(child: _SectionTitle('Internships', buttonLabel: 'Add', onAction: () => _editInternship())),
               SliverToBoxAdapter(
                 child: Padding(
@@ -1247,7 +1316,100 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
               ),
-
+              // CV Upload Section
+              SliverToBoxAdapter(child: _SectionTitle('CV / Resume', buttonLabel: _cvUrl.isEmpty ? 'Upload' : 'Update', onAction: _uploadCv)),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: hPad),
+                  child: _WhiteCard(
+                    child: _cvUrl.isEmpty
+                        ? Column(children: [
+                            const Icon(Icons.description_outlined, size: 40, color: _textGrey),
+                            const SizedBox(height: 8),
+                            Text('No CV uploaded yet',
+                                style: TextStyle(fontSize: 13, color: _textGrey.withOpacity(0.6))),
+                            const SizedBox(height: 12),
+                            ElevatedButton.icon(
+                              onPressed: _uploadCv,
+                              icon: const Icon(Icons.upload_file_rounded, size: 18),
+                              label: const Text('Upload CV'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: _blue,
+                                foregroundColor: _white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                            ),
+                          ])
+                        : Column(children: [
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: _blueLight,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: _blue.withOpacity(0.3)),
+                              ),
+                              child: Row(children: [
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: _blue.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Icon(Icons.picture_as_pdf_rounded, color: _blue, size: 28),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                    const Text('CV / Resume',
+                                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _textDark)),
+                                    const SizedBox(height: 2),
+                                    Text('PDF, DOC, or DOCX',
+                                        style: TextStyle(fontSize: 12, color: _textGrey)),
+                                  ]),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline_rounded, color: Colors.red),
+                                  onPressed: _deleteCv,
+                                  tooltip: 'Delete CV',
+                                ),
+                              ]),
+                            ),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: double.infinity,
+                              child: Row(children: [
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    onPressed: _viewCv,
+                                    icon: const Icon(Icons.visibility_rounded, size: 18),
+                                    label: const Text('View CV'),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: _blue,
+                                      side: const BorderSide(color: _blue),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    onPressed: _uploadCv,
+                                    icon: const Icon(Icons.refresh_rounded, size: 18),
+                                    label: const Text('Replace'),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: _blue,
+                                      side: const BorderSide(color: _blue),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    ),
+                                  ),
+                                ),
+                              ]),
+                            ),
+                          ]),
+                  ),
+                ),
+              ),
+               // Certificates
               SliverToBoxAdapter(child: _SectionTitle('Certificates', buttonLabel: 'Add', onAction: _addCertificate)),
               SliverToBoxAdapter(
                 child: Padding(
