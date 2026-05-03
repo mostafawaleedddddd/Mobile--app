@@ -1,3 +1,6 @@
+// import 'dart:typed_data';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 // import 'Faculty_Model.dart';
@@ -9,6 +12,7 @@ import 'Faculty_Session.dart';
 final _db = Supabase.instance.client;
 const Color _facultyIndigo = Color(0xFF303F9F);
 const Color _bgLight = Color(0xFFF8F9FD);
+const Color _primaryTeal = Color(0xFF26A69A);
 
 class FacultyHomePage extends StatefulWidget {
   final int facultyId;
@@ -78,102 +82,300 @@ void initState() {
 // ──────────────────────────────────────────────────────────────────────────────
 // SECTION 1: REVIEW QUEUE (Vetting)
 // ──────────────────────────────────────────────────────────────────────────────
-class ReviewQueuePage extends StatelessWidget {
+class ReviewQueuePage extends StatefulWidget {
   const ReviewQueuePage({super.key});
+
+  @override
+  State<ReviewQueuePage> createState() => _ReviewQueuePageState();
+}
+
+class _ReviewQueuePageState extends State<ReviewQueuePage>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _bgLight,
       appBar: AppBar(
-        title: const Text("Internship Vetting", 
-            style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        automaticallyImplyLeading: false, // REMOVES BACK ARROW
+        automaticallyImplyLeading: false,
+        title: const Text("Faculty Vetting"),
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: const [
+            Tab(text: "Internships"),
+            Tab(text: "Certificates"),
+          ],
+        ),
       ),
-      body: StreamBuilder<List<Map<String, dynamic>>>(
-        stream: _db.from('internships').stream(primaryKey: ['id']).eq('status', 'pending'),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-          final list = snapshot.data!;
-          if (list.isEmpty) return const Center(child: Text("No pending offers to review."));
-
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: list.length,
-            itemBuilder: (context, index) {
-              final job = list[index];
-              return Card(
-                elevation: 0,
-                margin: const EdgeInsets.only(bottom: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(color: Colors.grey.shade200),
-                ),
-                child: ListTile(
-                  leading: const CircleAvatar(backgroundColor: Color(0xFFE0F2F1), child: Icon(Icons.business, color: Color(0xFF26A69A))),
-                  title: Text(job['title'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text("Company ID: ${job['company_id']}"),
-                  onTap: () => _openReviewDialog(context, job),
-                ),
-              );
-            },
-          );
-        },
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          _buildInternshipList(),
+          _buildUsersWithCertificates(),
+        ],
       ),
     );
   }
 
-  void _openReviewDialog(BuildContext context, Map job) async {
-    final company = await _db.from('company_profile').select().eq('id', job['company_id']).single();
-    if (!context.mounted) return;
+  // ✅ USERS WITH CERTIFICATES
+  Widget _buildUsersWithCertificates() {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: _db.from('Certificates').select(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
+        final certificates = snapshot.data!;
+
+        if (certificates.isEmpty) {
+          return const Center(
+            child: Text("No certificates uploaded yet."),
+          );
+        }
+
+        // ✅ GROUP BY user_id
+        final Map<int, List<Map<String, dynamic>>> grouped = {};
+
+        for (var cert in certificates) {
+          final userId = cert['user_id'];
+          if (userId == null) continue;
+
+          grouped.putIfAbsent(userId, () => []);
+          grouped[userId]!.add(cert);
+        }
+
+        final userIds = grouped.keys.toList();
+
+        return FutureBuilder<List<Map<String, dynamic>>>(
+          future: _db
+              .from('User_profile')
+              .select()
+              .inFilter('id', userIds),
+          builder: (context, userSnapshot) {
+            if (!userSnapshot.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            final users = userSnapshot.data!;
+
+            return ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: users.length,
+              itemBuilder: (context, index) {
+                final user = users[index];
+
+                final userId = user['id'];
+                final name = user['name'] ?? 'Unknown';
+
+                final count = grouped[userId]?.length ?? 0;
+
+                return Card(
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      child: Text(name[0].toUpperCase()),
+                    ),
+                    title: Text(name),
+                    subtitle: Text("$count certificate(s)"),
+                    trailing: const Icon(Icons.arrow_forward_ios),
+                    onTap: () {
+                      _showCertificates(userId, name);
+                    },
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // ✅ SHOW CERTIFICATES
+  void _showCertificates(int userId, String name) {
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (context) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+      isScrollControlled: true,
+      builder: (context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.85,
+          builder: (_, scrollController) {
+            return FutureBuilder<List<Map<String, dynamic>>>(
+              future: _db
+                  .from('Certificates')
+                  .select()
+                  .eq('user_id', userId)
+                  .limit(20),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                final certs = snapshot.data!;
+
+                if (certs.isEmpty) {
+                  return const Center(
+                      child: Text("No certificates found."));
+                }
+
+                return Column(
+                  children: [
+                    const SizedBox(height: 10),
+                    Text(
+                      "Certificates: $name",
+                      style: const TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    Expanded(
+                      child: ListView.builder(
+                        controller: scrollController,
+                        itemCount: certs.length,
+                        itemBuilder: (context, i) =>
+                            _certificateCard(certs[i]),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // ✅ CERTIFICATE CARD
+  Widget _certificateCard(Map<String, dynamic> cert) {
+    final imageUrl = cert['image_url'] ?? '';
+
+    Widget imageWidget = const SizedBox();
+
+    if (imageUrl.isNotEmpty) {
+      if (imageUrl.startsWith('data:image')) {
+        try {
+          final bytes = base64Decode(imageUrl.split(',').last);
+          imageWidget = Image.memory(
+            bytes,
+            height: 200,
+            fit: BoxFit.cover,
+          );
+        } catch (e) {
+          imageWidget = const Text("Invalid image");
+        }
+      } else {
+        imageWidget = Image.network(
+          imageUrl,
+          height: 200,
+          fit: BoxFit.cover,
+        );
+      }
+    }
+
+    return Card(
+      margin: const EdgeInsets.all(10),
+      child: Column(
+        children: [
+          ListTile(
+            title: Text(cert['title'] ?? ''),
+            subtitle: Text(cert['date']?.toString() ?? ''),
+          ),
+
+          // ✅ CLICK TO ENLARGE
+          GestureDetector(
+            onTap: () => _showFullImage(imageUrl),
+            child: imageWidget,
+          ),
+
+          Row(
+            children: [
+              Expanded(
+                child: TextButton(
+                  onPressed: () async {
+                    await _db
+                        .from('Certificates')
+                        .delete()
+                        .eq('id', cert['id']);
+                    Navigator.pop(context);
+                  },
+                  child: const Text("Reject",
+                      style: TextStyle(color: Colors.red)),
+                ),
+              ),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () async {
+                    await _db.from('Certificates').update({
+                      'is_verified': true
+                    }).eq('id', cert['id']);
+                    Navigator.pop(context);
+                  },
+                  child: const Text("Accept"),
+                ),
+              ),
+            ],
+          )
+        ],
+      ),
+    );
+  }
+
+  // ✅ FULLSCREEN IMAGE VIEWER (ZOOM)
+  void _showFullImage(String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.black,
+        insetPadding: EdgeInsets.zero,
+        child: Stack(
           children: [
-            Text("Review: ${job['title']}", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Text("From: ${company['name']} (${company['email']})", style: const TextStyle(color: Colors.blueGrey)),
-            const Divider(height: 32),
-            Text(job['description'] ?? "No description"),
-            const SizedBox(height: 32),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () async {
-                      await _db.from('internships').update({'status': 'rejected'}).eq('id', job['id']);
-                      Navigator.pop(context);
-                    },
-                    child: const Text("Reject", style: TextStyle(color: Colors.red)),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF26A69A)),
-                    onPressed: () async {
-                      await _db.from('internships').update({'status': 'approved'}).eq('id', job['id']);
-                      Navigator.pop(context);
-                    },
-                    child: const Text("Approve", style: TextStyle(color: Colors.white)),
-                  ),
-                ),
-              ],
+            InteractiveViewer(
+              minScale: 1,
+              maxScale: 5,
+              child: Center(
+                child: _buildFullImage(imageUrl),
+              ),
+            ),
+
+            Positioned(
+              top: 40,
+              right: 20,
+              child: IconButton(
+                icon: const Icon(Icons.close,
+                    color: Colors.white, size: 30),
+                onPressed: () => Navigator.pop(context),
+              ),
             ),
           ],
         ),
       ),
     );
   }
+
+  // ✅ HANDLE IMAGE TYPE
+  Widget _buildFullImage(String imageUrl) {
+    if (imageUrl.startsWith('data:image')) {
+      try {
+        final bytes = base64Decode(imageUrl.split(',').last);
+        return Image.memory(bytes, fit: BoxFit.contain);
+      } catch (e) {
+        return const Text("Invalid image",
+            style: TextStyle(color: Colors.white));
+      }
+    } else {
+      return Image.network(imageUrl, fit: BoxFit.contain);
+    }
+  }
+
+  Widget _buildInternshipList() =>
+      const Center(child: Text("Internships"));
 }
+
 
 // ──────────────────────────────────────────────────────────────────────────────
 // SECTION 2: ANNOUNCEMENTS (Corrected Column Names)
