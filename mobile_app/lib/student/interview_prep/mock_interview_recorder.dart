@@ -49,7 +49,6 @@ class _MockInterviewRecorderScreenState extends State<MockInterviewRecorderScree
         ? (hasRecording ? 'Record a New Take' : 'Start Recording')
         : (hasRecording ? 'Record a New Take' : 'Start Recording');
   }
-  String get _reRecordButtonText => Platform.isWindows ? 'Re-select' : 'Re-record';
 
   @override
   void initState() {
@@ -138,18 +137,6 @@ class _MockInterviewRecorderScreenState extends State<MockInterviewRecorderScree
       _recordedFile!.deleteSync();
     }
     super.dispose();
-  }
-
-  void _togglePlayback() {
-    final controller = _videoController;
-    if (controller == null || !controller.value.isInitialized) return;
-
-    if (controller.value.isPlaying) {
-      controller.pause();
-    } else {
-      controller.play();
-    }
-    setState(() {});
   }
 
   @override
