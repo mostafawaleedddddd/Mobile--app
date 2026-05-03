@@ -5,6 +5,7 @@ import '../app_session.dart';
 import 'User_profile.dart';
 import 'survey.dart';
 import 'interview_prep.dart';
+import 'internships_page.dart';
 
 void main() => runApp(const MyApp());
 
@@ -199,7 +200,18 @@ class _HomePageState extends State<HomePage> {
       }
       return;
     }
-
+    if (index == 1) {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => InternshipsPage(
+            userId:      _userId!,
+            userName:   _username,
+            userEmail:   _email,
+          ),
+        ),
+      );
+      return;
+    }
     if (index == 2) {
       await _openProfile();
       return;

@@ -6,8 +6,6 @@ import 'Faculty_Home.dart';
 
 // ─── COLORS ──────────────────────────────────────────────────────────────────
 const _teal     = Color(0xFFFF6B6B);  // primary accent – matches UserRole teal
-const _tealDark = Color.fromARGB(255, 238, 41, 41);   // darker shade for depth
-const _tealBg   = Color(0xFFF0FBFA);   // very light teal background
 const _textDark = Color(0xFF1E293B);
 const _textGrey = Color(0xFF64748B);
 const _border   = Color(0xFFCBD5E1);

@@ -2,6 +2,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:camera/camera.dart';
 
 const _blue = Color(0xFF3B82F6);
 const _bluePale = Color(0xFFF0F7FF);
@@ -32,23 +34,86 @@ class _MockInterviewRecorderScreenState extends State<MockInterviewRecorderScree
   VideoPlayerController? _videoController;
   bool _isLoading = false;
 
+  List<CameraDescription>? cameras;
+  CameraController? controller;
+  bool isRecording = false;
+  String? tempVideoPath;
+
+  bool get hasRecording => _recordedFile != null && _videoController?.value.isInitialized == true;
+
+  String get _recordButtonText {
+    if (isRecording) {
+      return 'Stop Recording';
+    }
+    return Platform.isWindows
+        ? (hasRecording ? 'Record a New Take' : 'Start Recording')
+        : (hasRecording ? 'Record a New Take' : 'Start Recording');
+  }
+  String get _reRecordButtonText => Platform.isWindows ? 'Re-select' : 'Re-record';
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeCamera();
+  }
+
+  Future<void> _initializeCamera() async {
+    try {
+      cameras = await availableCameras();
+      if (cameras!.isNotEmpty) {
+        controller = CameraController(cameras![0], ResolutionPreset.medium);
+        await controller!.initialize();
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
   Future<void> _startRecording() async {
     setState(() {
       _isLoading = true;
     });
 
     try {
-      final XFile? video = await _picker.pickVideo(
-        source: ImageSource.camera,
-        maxDuration: const Duration(minutes: 10),
-      );
-
-      if (video == null) {
-        return;
+      if (Platform.isWindows) {
+        try {
+          // Prioritize camera recording
+          if (isRecording) {
+            final XFile file = await controller!.stopVideoRecording();
+            tempVideoPath = file.path;
+            _recordedFile = File(tempVideoPath!);
+            await _initializeVideoController(_recordedFile!);
+            setState(() {
+              isRecording = false;
+            });
+          } else {
+            await controller!.startVideoRecording();
+            setState(() {
+              isRecording = true;
+            });
+          }
+        } catch (e) {
+          // Fall back to file picker if camera fails
+          FilePickerResult? result = await FilePicker.platform.pickFiles(
+            type: FileType.video,
+          );
+          if (result == null || result.files.single.path == null) {
+            return;
+          }
+          _recordedFile = File(result.files.single.path!);
+          await _initializeVideoController(_recordedFile!);
+        }
+      } else {
+        final XFile? video = await _picker.pickVideo(
+          source: ImageSource.camera,
+          maxDuration: const Duration(minutes: 10),
+        );
+        if (video == null) {
+          return;
+        }
+        _recordedFile = File(video.path);
+        await _initializeVideoController(_recordedFile!);
       }
-
-      _recordedFile = File(video.path);
-      await _initializeVideoController(_recordedFile!);
     } finally {
       setState(() {
         _isLoading = false;
@@ -68,6 +133,10 @@ class _MockInterviewRecorderScreenState extends State<MockInterviewRecorderScree
   @override
   void dispose() {
     _videoController?.dispose();
+    controller?.dispose();
+    if (_recordedFile != null && _recordedFile!.existsSync()) {
+      _recordedFile!.deleteSync();
+    }
     super.dispose();
   }
 
@@ -85,8 +154,6 @@ class _MockInterviewRecorderScreenState extends State<MockInterviewRecorderScree
 
   @override
   Widget build(BuildContext context) {
-    final hasRecording = _recordedFile != null && _videoController?.value.isInitialized == true;
-
     return Scaffold(
       backgroundColor: _bluePale,
       appBar: AppBar(
@@ -183,82 +250,13 @@ class _MockInterviewRecorderScreenState extends State<MockInterviewRecorderScree
                   ],
                 ),
               ),
-              const SizedBox(height: 22),
-              Text(
-                'Your recording',
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: _textDark),
-              ),
-              const SizedBox(height: 12),
-              if (hasRecording) ...[
-                AspectRatio(
-                  aspectRatio: _videoController!.value.aspectRatio,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: VideoPlayer(_videoController!),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    ElevatedButton.icon(
-                      onPressed: _togglePlayback,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _blue,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                      ),
-                      icon: Icon(
-                        _videoController!.value.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                        size: 20,
-                      ),
-                      label: Text(_videoController!.value.isPlaying ? 'Pause' : 'Play'),
-                    ),
-                    const SizedBox(width: 12),
-                    OutlinedButton.icon(
-                      onPressed: _isLoading ? null : _startRecording,
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: _blue,
-                        side: BorderSide(color: _blue.withOpacity(0.8)),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                      ),
-                      icon: const Icon(Icons.fiber_manual_record_rounded, size: 20),
-                      label: const Text('Re-record'),
-                    ),
-                  ],
-                ),
-              ] else ...[
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 18),
-                  decoration: BoxDecoration(
-                    color: _white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: _border),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text(
-                        'No recording yet',
-                        style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: _textDark),
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        'Tap the button below to capture your first interview practice video.',
-                        style: TextStyle(fontSize: 13, color: _textGrey, height: 1.5),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
               const Spacer(),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: _isLoading ? null : _startRecording,
-                  icon: const Icon(Icons.videocam_rounded, size: 20),
-                  label: Text(hasRecording ? 'Record a New Take' : 'Start Recording'),
+                  icon: Icon(isRecording ? Icons.stop : Icons.videocam_rounded, size: 20),
+                  label: Text(_recordButtonText),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _blue,
                     padding: const EdgeInsets.symmetric(vertical: 16),
