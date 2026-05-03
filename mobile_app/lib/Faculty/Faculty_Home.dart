@@ -10,8 +10,15 @@ import 'Faculty_Session.dart';
 // import 'package:your_app/user_role_screen.dart';
 
 final _db = Supabase.instance.client;
+
+// ─── COLORS ────────────────────────────────
 const Color _facultyIndigo = Color(0xFF303F9F);
-const Color _bgLight = Color(0xFFF8F9FD);
+const Color _facultyIndigoLight = Color(0xFFEEF0FF);
+const Color _facultyIndigoPale = Color(0xFFF5F6FF);
+const Color _accentTeal = Color(0xFF26A69A);
+const Color _white = Colors.white;
+const Color _textDark = Color(0xFF1E293B);
+const Color _textGrey = Color(0xFF64748B);
 
 class FacultyHomePage extends StatefulWidget {
   final int facultyId;
@@ -106,9 +113,12 @@ class _ReviewQueuePageState extends State<ReviewQueuePage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: _facultyIndigoPale,
       appBar: AppBar(
         automaticallyImplyLeading: false,
         title: const Text("Faculty Vetting"),
+        backgroundColor: _facultyIndigoPale,
+        elevation: 0,
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
@@ -117,9 +127,29 @@ class _ReviewQueuePageState extends State<ReviewQueuePage>
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [_buildInternshipList(), _buildUsersWithCertificates()],
+      body: Stack(
+        children: [
+          Positioned(
+            top: -MediaQuery.of(context).size.height * 0.1,
+            left: -MediaQuery.of(context).size.width * 0.2,
+            child: _Blob(
+              size: MediaQuery.of(context).size.width * 0.8,
+              color: _facultyIndigo.withOpacity(0.08),
+            ),
+          ),
+          Positioned(
+            bottom: -MediaQuery.of(context).size.height * 0.08,
+            right: -MediaQuery.of(context).size.width * 0.15,
+            child: _Blob(
+              size: MediaQuery.of(context).size.width * 0.65,
+              color: _accentTeal.withOpacity(0.06),
+            ),
+          ),
+          TabBarView(
+            controller: _tabController,
+            children: [_buildInternshipList(), _buildUsersWithCertificates()],
+          ),
+        ],
       ),
     );
   }
@@ -472,10 +502,14 @@ class _ReviewQueuePageState extends State<ReviewQueuePage>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
+            style: TextButton.styleFrom(foregroundColor: Colors.black),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Deny'),
           ),
@@ -565,106 +599,128 @@ class _PostAnnouncementPageState extends State<PostAnnouncementPage> {
 
   @override
   Widget build(BuildContext context) {
+    final sw = MediaQuery.of(context).size.width;
+    final sh = MediaQuery.of(context).size.height;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FD),
+      backgroundColor: _facultyIndigoPale,
       appBar: AppBar(
         title: const Text(
           "Post Announcement",
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+          style: TextStyle(color: _textDark, fontWeight: FontWeight.bold),
         ),
         automaticallyImplyLeading: false,
-        backgroundColor: Colors.white,
+        backgroundColor: _facultyIndigoPale,
         elevation: 0,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              "Announcement Details",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+      body: Stack(
+        children: [
+          Positioned(
+            top: -sh * 0.12,
+            right: -sw * 0.25,
+            child: _Blob(
+              size: sw * 0.85,
+              color: _facultyIndigo.withOpacity(0.08),
             ),
-            const SizedBox(height: 20),
-
-            TextField(
-              controller: _titleController,
-              decoration: InputDecoration(
-                labelText: "Title (e.g., Internship Fair 2025)",
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            DropdownButtonFormField<String>(
-              value: _selectedTag,
-              decoration: InputDecoration(
-                labelText: "Category Tag",
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              items: _tags
-                  .map((tag) => DropdownMenuItem(value: tag, child: Text(tag)))
-                  .toList(),
-              onChanged: (val) => setState(() => _selectedTag = val!),
-            ),
-            const SizedBox(height: 16),
-
-            TextField(
-              controller: _bodyController,
-              maxLines: 5,
-              decoration: InputDecoration(
-                labelText: "Announcement Description",
-                alignLabelWithHint: true,
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-            const SizedBox(height: 30),
-
-            SizedBox(
-              width: double.infinity,
-              height: 55,
-              child: ElevatedButton.icon(
-                onPressed: _isPosting ? null : _broadcastAnnouncement,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF26A69A),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                icon: _isPosting
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : const Icon(Icons.campaign_rounded, color: Colors.white),
-                label: const Text(
-                  "Broadcast to Students",
+          ),
+          Positioned(
+            bottom: -sh * 0.1,
+            left: -sw * 0.2,
+            child: _Blob(size: sw * 0.7, color: _accentTeal.withOpacity(0.06)),
+          ),
+          SingleChildScrollView(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Announcement Details",
                   style: TextStyle(
-                    color: Colors.white,
+                    fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    fontSize: 16,
+                    color: _textDark,
                   ),
                 ),
-              ),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: _titleController,
+                  decoration: InputDecoration(
+                    labelText: "Title (e.g., Internship Fair 2025)",
+                    filled: true,
+                    fillColor: _white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  value: _selectedTag,
+                  decoration: InputDecoration(
+                    labelText: "Category Tag",
+                    filled: true,
+                    fillColor: _white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  items: _tags
+                      .map(
+                        (tag) => DropdownMenuItem(value: tag, child: Text(tag)),
+                      )
+                      .toList(),
+                  onChanged: (val) => setState(() => _selectedTag = val!),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _bodyController,
+                  maxLines: 5,
+                  decoration: InputDecoration(
+                    labelText: "Announcement Description",
+                    alignLabelWithHint: true,
+                    filled: true,
+                    fillColor: _white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 30),
+                SizedBox(
+                  width: double.infinity,
+                  height: 55,
+                  child: ElevatedButton.icon(
+                    onPressed: _isPosting ? null : _broadcastAnnouncement,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _accentTeal,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    icon: _isPosting
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              color: _white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Icon(Icons.campaign_rounded, color: _white),
+                    label: const Text(
+                      "Broadcast to Students",
+                      style: TextStyle(
+                        color: _white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -676,123 +732,171 @@ class _PostAnnouncementPageState extends State<PostAnnouncementPage> {
 class FacultyProfilePage extends StatelessWidget {
   const FacultyProfilePage({super.key});
 
-  // Local constants for your styling
-  static const Color _textGrey = Colors.grey;
-  static const Color _white = Colors.white;
-
   @override
   Widget build(BuildContext context) {
+    final sw = MediaQuery.of(context).size.width;
+    final sh = MediaQuery.of(context).size.height;
+
     return Scaffold(
-      backgroundColor: _bgLight,
+      backgroundColor: _facultyIndigoPale,
       appBar: AppBar(
         title: const Text(
           "Faculty Profile",
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+          style: TextStyle(color: _textDark, fontWeight: FontWeight.bold),
         ),
-        automaticallyImplyLeading: false, // Removes the back arrow
-        backgroundColor: Colors.white,
+        automaticallyImplyLeading: false,
+        backgroundColor: _facultyIndigoPale,
         elevation: 0,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          children: [
-            const CircleAvatar(
-              radius: 45,
-              backgroundColor: _facultyIndigo,
-              child: Icon(Icons.person, size: 45, color: Colors.white),
+      body: Stack(
+        children: [
+          Positioned(
+            top: -sh * 0.15,
+            left: -sw * 0.2,
+            child: _Blob(
+              size: sw * 0.85,
+              color: _facultyIndigo.withOpacity(0.08),
             ),
-            const SizedBox(height: 16),
-
-            // Syncing with your FacultySession variables
-            Text(
-              FacultySession.name ?? "Faculty Member",
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            Text(
-              FacultySession.email ?? "email@university.edu",
-              style: const TextStyle(color: Colors.grey),
-            ),
-
-            const SizedBox(height: 8),
-            Chip(
-              label: Text(FacultySession.department ?? "Department"),
-              backgroundColor: Colors.indigo[50],
-            ),
-
-            const Spacer(),
-
-            // --- LOGOUT BUTTON SECTION ---
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  showDialog(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      title: const Text(
-                        'Log Out',
-                        style: TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      content: const Text('Are you sure you want to log out?'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(ctx),
-                          child: const Text(
-                            'Cancel',
-                            style: TextStyle(color: _textGrey),
-                          ),
-                        ),
-                        ElevatedButton(
-                          onPressed: () {
-                            Navigator.pop(ctx);
-                            FacultySession.clear();
-                            Navigator.of(
-                              context,
-                            ).popUntil((route) => route.isFirst);
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
-                            foregroundColor: _white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          child: const Text('Log Out'),
-                        ),
-                      ],
+          ),
+          Positioned(
+            bottom: -sh * 0.1,
+            right: -sw * 0.15,
+            child: _Blob(size: sw * 0.7, color: _accentTeal.withOpacity(0.06)),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              children: [
+                CircleAvatar(
+                  radius: 45,
+                  backgroundColor: _facultyIndigo,
+                  child: const Icon(Icons.person, size: 45, color: _white),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  FacultySession.name ?? "Faculty Member",
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: _textDark,
+                  ),
+                ),
+                Text(
+                  FacultySession.email ?? "email@university.edu",
+                  style: const TextStyle(color: _textGrey),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _facultyIndigoLight,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: _facultyIndigo.withOpacity(0.2)),
+                  ),
+                  child: Text(
+                    FacultySession.department ?? "Department",
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: _facultyIndigo,
                     ),
-                  );
-                },
-                icon: const Icon(
-                  Icons.logout_rounded,
-                  color: Colors.red,
-                  size: 18,
-                ),
-                label: const Text(
-                  'Log Out',
-                  style: TextStyle(
-                    color: Colors.red,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Colors.red, width: 1.4),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                const Spacer(),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          title: const Text(
+                            'Log Out',
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          content: const Text(
+                            'Are you sure you want to log out?',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              child: const Text(
+                                'Cancel',
+                                style: TextStyle(color: _textGrey),
+                              ),
+                            ),
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.pop(ctx);
+                                FacultySession.clear();
+                                Navigator.of(
+                                  context,
+                                ).popUntil((route) => route.isFirst);
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                foregroundColor: _white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              child: const Text('Log Out'),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    icon: const Icon(
+                      Icons.logout_rounded,
+                      color: Colors.red,
+                      size: 18,
+                    ),
+                    label: const Text(
+                      'Log Out',
+                      style: TextStyle(
+                        color: Colors.red,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Colors.red, width: 1.4),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
                   ),
                 ),
-              ),
+                const SizedBox(height: 20),
+              ],
             ),
-            const SizedBox(height: 20),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// DECORATOR BLOB WIDGET
+// ──────────────────────────────────────────────────────────────────────────────
+class _Blob extends StatelessWidget {
+  final double size;
+  final Color color;
+
+  const _Blob({required this.size, required this.color});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: size,
+    height: size,
+    decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+  );
 }
