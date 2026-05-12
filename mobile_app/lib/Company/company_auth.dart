@@ -1,23 +1,23 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // company_auth.dart
 // Login & Register screen for the Hiring Company role.
-// Same flip-card pattern as Login_Signup.dart; teal accent to match UserRole.
-// Supabase table assumed: "Company_profile"
-//   columns: id (int8 pk), name (text), email (text unique),
-//            password (text), industry (text), location (text)
 // ─────────────────────────────────────────────────────────────────────────────
 
 import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
 import 'company_session.dart';
 import 'company_home.dart';
 
-// ─── COLORS (Brand Accents) ──────────────────────────────────────────────────
-const _teal     = Color(0xFF00C6A7);   // primary accent – matches UserRole teal
-const _tealDark = Color(0xFF009E87);   // darker shade for depth
+// ─── COLORS (Strict Light Mode Branding) ─────────────────────────────────────
+const _teal     = Color(0xFF00C6A7);   
+const _tealDark = Color(0xFF009E87);   
+const _bgAccent = Color(0xFFF4FDFB);   // Very light teal background
+const _textDark = Color(0xFF1E293B);
+const _textGrey = Color(0xFF64748B);
+const _border   = Color(0xFFCBD5E1);
+const _fieldBg  = Color(0xFFF8FAFC);
+const _white    = Colors.white;
 
 // ─── SUPABASE CLIENT ─────────────────────────────────────────────────────────
 final _db = Supabase.instance.client;
@@ -60,12 +60,11 @@ class _CompanyAuthScreenState extends State<CompanyAuthScreen>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context).colorScheme;
     final sw = MediaQuery.of(context).size.width;
     final sh = MediaQuery.of(context).size.height;
 
     return Scaffold(
-      backgroundColor: theme.surface,
+      backgroundColor: _bgAccent, // Locked to Light Background
       body: Stack(
         children: [
           // ─── BACKGROUND BLOBS ───
@@ -125,7 +124,7 @@ class _CompanyAuthScreenState extends State<CompanyAuthScreen>
                     width: 44,
                     height: 44,
                     decoration: BoxDecoration(
-                      color: theme.surfaceContainerHighest,
+                      color: _white,
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
@@ -136,7 +135,7 @@ class _CompanyAuthScreenState extends State<CompanyAuthScreen>
                     ),
                     child: IconButton(
                       icon: const Icon(Icons.arrow_back),
-                      color: theme.onSurface,
+                      color: _textDark,
                       onPressed: () {
                         if (_showRegister) {
                           _flip(); // go back to login
@@ -177,12 +176,11 @@ class _CardShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context).colorScheme;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 30),
       decoration: BoxDecoration(
-        color: theme.surfaceContainerHighest,
+        color: _white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
@@ -275,8 +273,6 @@ class _LoginCardState extends State<_LoginCard> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context).colorScheme;
-
     return _CardShell(
       child: Form(
         key: _formKey,
@@ -302,16 +298,16 @@ class _LoginCardState extends State<_LoginCard> {
                       color: Colors.white, size: 22),
                 ),
                 const SizedBox(width: 14),
-                Column(
+                const Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Company Sign In',
                         style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w800,
-                            color: theme.onSurface)),
+                            color: _textDark)),
                     Text('Welcome back, let\'s recruit!',
-                        style: TextStyle(fontSize: 12, color: theme.onSurfaceVariant)),
+                        style: TextStyle(fontSize: 12, color: _textGrey)),
                   ],
                 ),
               ],
@@ -491,8 +487,6 @@ class _RegisterCardState extends State<_RegisterCard> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context).colorScheme;
-
     return _CardShell(
       child: Form(
         key: _formKey,
@@ -518,16 +512,16 @@ class _RegisterCardState extends State<_RegisterCard> {
                       color: Colors.white, size: 22),
                 ),
                 const SizedBox(width: 14),
-                Column(
+                const Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Create Company',
                         style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w800,
-                            color: theme.onSurface)),
+                            color: _textDark)),
                     Text('Register your hiring account',
-                        style: TextStyle(fontSize: 12, color: theme.onSurfaceVariant)),
+                        style: TextStyle(fontSize: 12, color: _textGrey)),
                   ],
                 ),
               ],
@@ -668,10 +662,10 @@ class _Label extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Text(
         text,
-        style: TextStyle(
+        style: const TextStyle(
             fontSize: 13, 
             fontWeight: FontWeight.w600, 
-            color: Theme.of(context).colorScheme.onSurface),
+            color: _textDark),
       );
 }
 
@@ -702,27 +696,25 @@ class _FieldState extends State<_Field> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context).colorScheme;
-
     return TextFormField(
       controller: widget.controller,
       obscureText: widget.obscure && _hide,
       keyboardType: widget.keyboardType,
       validator: widget.validator,
       autovalidateMode: AutovalidateMode.onUserInteraction,
-      style: TextStyle(
-          fontSize: 14, color: theme.onSurface, fontWeight: FontWeight.w500),
+      style: const TextStyle(
+          fontSize: 14, color: _textDark, fontWeight: FontWeight.w500),
       decoration: InputDecoration(
         hintText: widget.hint,
-        hintStyle: TextStyle(color: theme.onSurfaceVariant.withOpacity(0.6), fontSize: 14),
+        hintStyle: const TextStyle(color: Color(0xFFADB5BD), fontSize: 14),
         filled: true,
-        fillColor: theme.surface,
+        fillColor: _fieldBg,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
         errorStyle: const TextStyle(
             fontSize: 11, color: Color(0xFFEF4444), height: 1.3),
         prefixIcon:
-            Icon(widget.icon, color: theme.onSurfaceVariant.withOpacity(0.8), size: 18),
+            Icon(widget.icon, color: const Color(0xFF94A3B8), size: 18),
         suffixIcon: widget.obscure
             ? IconButton(
                 icon: Icon(
@@ -730,18 +722,18 @@ class _FieldState extends State<_Field> {
                       ? Icons.visibility_off_outlined
                       : Icons.visibility_outlined,
                   size: 17,
-                  color: theme.onSurfaceVariant.withOpacity(0.8),
+                  color: const Color(0xFF94A3B8),
                 ),
                 onPressed: () => setState(() => _hide = !_hide),
               )
             : null,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: theme.outline, width: 1.3),
+          borderSide: const BorderSide(color: _border, width: 1.3),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: theme.outline, width: 1.3),
+          borderSide: const BorderSide(color: _border, width: 1.3),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -769,8 +761,6 @@ class _InkLink extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context).colorScheme;
-
     return Material(
       color: Colors.transparent,
       borderRadius: BorderRadius.circular(6),
@@ -786,7 +776,7 @@ class _InkLink extends StatelessWidget {
               children: [
                 TextSpan(
                     text: plain,
-                    style: TextStyle(fontSize: 13, color: theme.onSurfaceVariant)),
+                    style: const TextStyle(fontSize: 13, color: _textGrey)),
                 TextSpan(
                     text: linked,
                     style: const TextStyle(
