@@ -4,12 +4,8 @@ import 'interview_prep/technical_questions.dart';
 import 'interview_prep/mock_interview.dart';
 import 'interview_prep/tips_and_tricks.dart';
 
-// ─── COLORS (match internships_page.dart palette) ────────────────────────────
+// ─── COLORS (preserve brand accent) ──────────────────────────────────────────
 const _blue      = Color(0xFF3B82F6);
-const _bluePale  = Color(0xFFF0F7FF);
-const _textDark  = Color(0xFF1E293B);
-const _textGrey  = Color(0xFF64748B);
-const _white     = Colors.white;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // INTERVIEW PREP SCREEN
@@ -110,8 +106,10 @@ class _InterviewPrepScreenState extends State<InterviewPrepScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
+    
     return Scaffold(
-      backgroundColor: _bluePale,
+      backgroundColor: theme.surface,
       body: Stack(
         children: [
           // Background blobs
@@ -141,7 +139,7 @@ class _InterviewPrepScreenState extends State<InterviewPrepScreen> {
                         child: Container(
                           width: 40, height: 40,
                           decoration: BoxDecoration(
-                            color: _white,
+                            color: theme.surfaceContainerHighest,
                             borderRadius: BorderRadius.circular(12),
                             boxShadow: [
                               BoxShadow(
@@ -150,12 +148,12 @@ class _InterviewPrepScreenState extends State<InterviewPrepScreen> {
                                   offset: const Offset(0, 3))
                             ],
                           ),
-                          child: const Icon(Icons.arrow_back_ios_new_rounded,
-                              color: _textDark, size: 16),
+                          child: Icon(Icons.arrow_back_ios_new_rounded,
+                              color: theme.onSurface, size: 16),
                         ),
                       ),
                       const SizedBox(width: 14),
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -163,11 +161,11 @@ class _InterviewPrepScreenState extends State<InterviewPrepScreen> {
                                 style: TextStyle(
                                     fontSize: 22,
                                     fontWeight: FontWeight.w800,
-                                    color: _textDark,
+                                    color: theme.onSurface,
                                     letterSpacing: -0.3)),
                             Text('Practice & master your interview skills',
                                 style: TextStyle(
-                                    fontSize: 12, color: _textGrey)),
+                                    fontSize: 12, color: theme.onSurfaceVariant)),
                           ],
                         ),
                       ),
@@ -179,7 +177,7 @@ class _InterviewPrepScreenState extends State<InterviewPrepScreen> {
                   padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: _white,
+                      color: theme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(14),
                       boxShadow: [
                         BoxShadow(
@@ -190,24 +188,24 @@ class _InterviewPrepScreenState extends State<InterviewPrepScreen> {
                     ),
                     child: TextField(
                       controller: _searchCtrl,
-                      style: const TextStyle(fontSize: 14, color: _textDark),
+                      style: TextStyle(fontSize: 14, color: theme.onSurface),
                       decoration: InputDecoration(
                         hintText: 'Search prep materials...',
-                        hintStyle: const TextStyle(
-                            color: Color(0xFFADB5BD), fontSize: 13),
-                        prefixIcon: const Icon(Icons.search_rounded,
-                            color: Color(0xFF94A3B8), size: 20),
+                        hintStyle: TextStyle(
+                            color: theme.onSurfaceVariant.withOpacity(0.6), fontSize: 13),
+                        prefixIcon: Icon(Icons.search_rounded,
+                            color: theme.onSurfaceVariant.withOpacity(0.8), size: 20),
                         suffixIcon: _searchCtrl.text.isNotEmpty
                             ? IconButton(
-                                icon: const Icon(Icons.close_rounded,
-                                    size: 18, color: Color(0xFF94A3B8)),
+                                icon: Icon(Icons.close_rounded,
+                                    size: 18, color: theme.onSurfaceVariant.withOpacity(0.8)),
                                 onPressed: () {
                                   _searchCtrl.clear();
                                 },
                               )
                             : null,
                         filled: true,
-                        fillColor: _white,
+                        fillColor: theme.surfaceContainerHighest,
                         contentPadding: const EdgeInsets.symmetric(
                             horizontal: 16, vertical: 14),
                         border: OutlineInputBorder(
@@ -229,18 +227,18 @@ class _InterviewPrepScreenState extends State<InterviewPrepScreen> {
                   padding: const EdgeInsets.fromLTRB(20, 14, 20, 6),
                   child: Text(
                     '${_filtered.length} prep item${_filtered.length == 1 ? '' : 's'}',
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: _textGrey),
+                        color: theme.onSurfaceVariant),
                   ),
                 ),
                 // ── Grid ──
                 Expanded(
                   child: _filtered.isEmpty
-                      ? const Center(
+                      ? Center(
                           child: Text('No prep materials found.',
-                              style: TextStyle(color: _textGrey)))
+                              style: TextStyle(color: theme.onSurfaceVariant)))
                       : GridView.builder(
                           padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
                           gridDelegate:
@@ -276,11 +274,13 @@ class _PrepCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
+    
     return GestureDetector(
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: _white,
+          color: theme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(18),
           boxShadow: [
             BoxShadow(
@@ -317,18 +317,18 @@ class _PrepCard extends StatelessWidget {
                 children: [
                   Text(
                     item['title'] as String,
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
-                        color: _textDark),
+                        color: theme.onSurface),
                     overflow: TextOverflow.ellipsis,
                     maxLines: 2,
                   ),
                   const SizedBox(height: 4),
                   Text(
                     item['description'] as String,
-                    style: const TextStyle(
-                        fontSize: 10, color: _textGrey),
+                    style: TextStyle(
+                        fontSize: 10, color: theme.onSurfaceVariant),
                     overflow: TextOverflow.ellipsis,
                     maxLines: 1,
                   ),

@@ -1,24 +1,13 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:provider/provider.dart';
 import '../app_session.dart';
+import '../theme_provider.dart';
 import 'User_profile.dart';
 import 'survey.dart';
 import 'interview_prep.dart';
 import 'internships_page.dart';
-
-void main() => runApp(const MyApp());
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) => MaterialApp(
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData(fontFamily: 'sans-serif'),
-        home: const HomePage(),
-      );
-}
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -27,17 +16,7 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) => const HomePage();
 }
 
-const _violet = Color(0xFF7C3AED);
-//const _violetL = Color(0xFFEDE9FE);
-const _blue = Color(0xFF3B82F6);
-const _blueL = Color(0xFFEFF6FF);
-// const _pink = Color(0xFFEC4899);
-const _bg = Color(0xFFF8F7FF);
 const _white = Colors.white;
-const _textDark = Color(0xFF1E1B4B);
-const _textGrey = Color(0xFF6B7280);
-const _border = Color(0xFFE5E7EB);
-
 const _appliedColor = Color(0xFF3B82F6);
 const _acceptedColor = Color(0xFF10B981);
 const _rejectedColor = Color(0xFFEF4444);
@@ -46,11 +25,27 @@ const _interviewColor = Color(0xFF7C3AED);
 final _activityTabs = ['All', 'Applied', 'Interview', 'Rejected'];
 const _tabStatuses = ['', 'pending', 'interview', 'rejected'];
 
-String _getInitials(String name) => name.trim().split(' ').where((e) => e.isNotEmpty).take(2).map((e) => e[0].toUpperCase()).join();
+String _getInitials(String name) => name
+    .trim()
+    .split(' ')
+    .where((e) => e.isNotEmpty)
+    .take(2)
+    .map((e) => e[0].toUpperCase())
+    .join();
 
 final _toolsToUse = [
-  _TooltoUse(title: 'Resume Analyzer', subtitle: 'Get AI feedback on your CV', icon: Icons.description_outlined, grad: [Color(0xFF7C3AED), Color(0xFF4F46E5)]),
-  _TooltoUse(title: 'Interview Prep', subtitle: 'Practice mock interviews', icon: Icons.record_voice_over_outlined, grad: [Color(0xFF0284C7), Color(0xFF06B6D4)]),
+  _TooltoUse(
+    title: 'Resume Analyzer',
+    subtitle: 'Get AI feedback on your CV',
+    icon: Icons.description_outlined,
+    grad: [Color(0xFF7C3AED), Color(0xFF4F46E5)],
+  ),
+  _TooltoUse(
+    title: 'Interview Prep',
+    subtitle: 'Practice mock interviews',
+    icon: Icons.record_voice_over_outlined,
+    grad: [Color(0xFF0284C7), Color(0xFF06B6D4)],
+  ),
 ];
 
 class _TooltoUse {
@@ -107,14 +102,14 @@ class _HomePageState extends State<HomePage> {
     _loadCurrentUser();
     _refreshTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
       if (mounted) {
-        setState(() {
-        });
+        setState(() {});
       }
     });
   }
+
   @override
   void dispose() {
-    _refreshTimer?.cancel(); 
+    _refreshTimer?.cancel();
     super.dispose();
   }
 
@@ -122,38 +117,63 @@ class _HomePageState extends State<HomePage> {
     setState(() => _isLoading = true);
     try {
       Map<String, dynamic>? user;
-      final sessionEmail = AppSession.email ??
+      final sessionEmail =
+          AppSession.email ??
           _db.auth.currentSession?.user.email ??
           _db.auth.currentUser?.email;
 
       if (widget.userId != null) {
-        user = await _db.from('User_profile').select().eq('id', widget.userId!).maybeSingle();
+        user = await _db
+            .from('User_profile')
+            .select()
+            .eq('id', widget.userId!)
+            .maybeSingle();
       } else if (sessionEmail != null && sessionEmail.isNotEmpty) {
-        user = await _db.from('User_profile').select().eq('email', sessionEmail).maybeSingle();
+        user = await _db
+            .from('User_profile')
+            .select()
+            .eq('email', sessionEmail)
+            .maybeSingle();
       }
 
       List<Map<String, dynamic>> internships = [];
       if (user != null) {
-        final internshipRows =
-            await _db.from('Internships').select().eq('user_id', user['id']).order('id', ascending: false);
+        final internshipRows = await _db
+            .from('Internships')
+            .select()
+            .eq('user_id', user['id'])
+            .order('id', ascending: false);
         internships = List<Map<String, dynamic>>.from(internshipRows);
       }
 
       List<Map<String, dynamic>> applications = [];
       if (user != null) {
-        final appsRows = await _db.from('Job_applications').select('*, Job_postings!inner(title, company_id, Company_profile!inner(name))').eq('student_id', user['id']).order('applied_at', ascending: false);
-        applications = appsRows.map((row) => {
-          'job_title': row['Job_postings']['title'] as String,
-          'company_name': row['Job_postings']['Company_profile']['name'] as String,
-          'status': row['status'] as String,
-          'applied_at': row['applied_at'] as String?,
-        }).toList();
+        final appsRows = await _db
+            .from('Job_applications')
+            .select(
+              '*, Job_postings!inner(title, company_id, Company_profile!inner(name))',
+            )
+            .eq('student_id', user['id'])
+            .order('applied_at', ascending: false);
+        applications = appsRows
+            .map(
+              (row) => {
+                'job_title': row['Job_postings']['title'] as String,
+                'company_name':
+                    row['Job_postings']['Company_profile']['name'] as String,
+                'status': row['status'] as String,
+                'applied_at': row['applied_at'] as String?,
+              },
+            )
+            .toList();
       }
 
       if (!mounted) return;
       setState(() {
         _userId = user?['id'] as int?;
-        _username = ((user?['name'] ?? '') as String).trim().isEmpty ? 'Student' : user!['name'] as String;
+        _username = ((user?['name'] ?? '') as String).trim().isEmpty
+            ? 'Student'
+            : user!['name'] as String;
         _email = (user?['email'] ?? '') as String;
         _internships = internships;
         _applications = applications;
@@ -161,15 +181,14 @@ class _HomePageState extends State<HomePage> {
       });
 
       if (user != null) {
-        AppSession.setUser(
-          userEmail: _email,
-          id: user['id'] as int,
-        );
+        AppSession.setUser(userEmail: _email, id: user['id'] as int);
       }
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: $e')));
     }
   }
 
@@ -181,7 +200,11 @@ class _HomePageState extends State<HomePage> {
   }
 
   String _initials() {
-    final parts = _username.trim().split(' ').where((e) => e.isNotEmpty).toList();
+    final parts = _username
+        .trim()
+        .split(' ')
+        .where((e) => e.isNotEmpty)
+        .toList();
     if (parts.isEmpty) return 'S';
     return parts.take(2).map((e) => e[0].toUpperCase()).join();
   }
@@ -204,9 +227,9 @@ class _HomePageState extends State<HomePage> {
       await Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => InternshipsPage(
-            userId:      _userId!,
-            userName:   _username,
-            userEmail:   _email,
+            userId: _userId!,
+            userName: _username,
+            userEmail: _email,
           ),
         ),
       );
@@ -223,9 +246,13 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        backgroundColor: _bg,
-        body: Center(child: CircularProgressIndicator(color: _blue)),
+      return Scaffold(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        body: Center(
+          child: CircularProgressIndicator(
+            color: Theme.of(context).colorScheme.primary,
+          ),
+        ),
       );
     }
 
@@ -234,7 +261,7 @@ class _HomePageState extends State<HomePage> {
         : _buildHomeBody();
 
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       body: body,
       bottomNavigationBar: _BottomBar(
         currentIndex: _navIndex,
@@ -244,80 +271,111 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildHomeBody() {
-  return SafeArea(
-    child: CustomScrollView(
-      slivers: [
-        SliverToBoxAdapter(child: _buildWelcomeHeader()),
-        SliverToBoxAdapter(child: _buildActivityTabs()),
-        SliverToBoxAdapter(child: _buildSectionHeader('My Applications', 'View All', () {})),
-        SliverToBoxAdapter(child: _buildApplicationsList()),
-        SliverToBoxAdapter(child: _buildSectionHeader('Tools to use', '', null)),
-        SliverToBoxAdapter(child: _buildToolsToUse()),
-        SliverToBoxAdapter(
-  child: _buildSectionHeader(
-    'University Announcements', 
-    'View All', 
-    () {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const AllAnnouncementsScreen()),
-      );
-    },
-  ),
-),
-        
-        // --- DYNAMIC ANNOUNCEMENTS SECTION START ---
-SliverToBoxAdapter(
-  child: Padding(
-    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-    child: StreamBuilder<List<Map<String, dynamic>>>(
-      stream: Supabase.instance.client
-          .from('university_announcements') 
-          .stream(primaryKey: ['id'])
-          .order('created_at', ascending: false),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
+    final sw = MediaQuery.of(context).size.width;
+    final theme = Theme.of(context).colorScheme;
 
-        final liveData = snapshot.data ?? [];
-        
-        // This is the filter
-        final previewData = liveData.take(3).toList();
-        
-        print("Total in DB: ${liveData.length} | Showing on Home: ${previewData.length}");
+    return Stack(
+      children: [
+        Positioned(
+          top: -80,
+          left: -60,
+          child: _Blob(size: sw * 0.75, color: theme.primary.withOpacity(0.07)),
+        ),
+        Positioned(
+          bottom: -60,
+          right: -40,
+          child: _Blob(size: sw * 0.55, color: theme.primary.withOpacity(0.05)),
+        ),
 
-        if (previewData.isEmpty) {
-          return const Center(
-            child: Padding(
-              padding: EdgeInsets.all(20.0),
-              child: Text("No university announcements yet."),
-            ),
-          );
-        }
+        SafeArea(
+          child: CustomScrollView(
+            slivers: [
+              SliverToBoxAdapter(child: _buildWelcomeHeader()),
+              SliverToBoxAdapter(child: _buildActivityTabs()),
+              SliverToBoxAdapter(
+                child: _buildSectionHeader('My Applications', 'View All', () {
+                  if (_userId != null) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            AllApplicationsScreen(userId: _userId!),
+                      ),
+                    );
+                  }
+                }),
+              ),
+              SliverToBoxAdapter(child: _buildApplicationsList()),
+              SliverToBoxAdapter(
+                child: _buildSectionHeader('Tools to use', '', null),
+              ),
+              SliverToBoxAdapter(child: _buildToolsToUse()),
+              SliverToBoxAdapter(
+                child: _buildSectionHeader(
+                  'University Announcements',
+                  'View All',
+                  () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const AllAnnouncementsScreen(),
+                      ),
+                    );
+                  },
+                ),
+              ),
 
-        return Column(
-          // We MUST map previewData here
-          children: previewData.map((item) {
-            final a = _Announcement(
-              title: item['title'] ?? 'Untitled',
-              body: item['description'] ?? '',
-              date: _formatTimeAgo(item['created_at']), 
-              type: item['type'] ?? 'News',
-              typeColor: _getLiveTypeColor(item['type']),
-            );
-            return _AnnouncementCard(a: a);
-          }).toList(),
-        );
-      },
-    ),
-  ),
-),
+              // --- DYNAMIC ANNOUNCEMENTS SECTION START ---
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                  child: StreamBuilder<List<Map<String, dynamic>>>(
+                    stream: Supabase.instance.client
+                        .from('university_announcements')
+                        .stream(primaryKey: ['id'])
+                        .order('created_at', ascending: false),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+
+                      final liveData = snapshot.data ?? [];
+
+                      // This is the filter
+                      final previewData = liveData.take(3).toList();
+
+                      if (previewData.isEmpty) {
+                        return const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(20.0),
+                            child: Text("No university announcements yet."),
+                          ),
+                        );
+                      }
+
+                      return Column(
+                        // map previewData here
+                        children: previewData.map((item) {
+                          final a = _Announcement(
+                            title: item['title'] ?? 'Untitled',
+                            body: item['description'] ?? '',
+                            date: _formatTimeAgo(item['created_at']),
+                            type: item['type'] ?? 'News',
+                            typeColor: _getLiveTypeColor(item['type']),
+                          );
+                          return _AnnouncementCard(a: a);
+                        }).toList(),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
-    ),
-  );
-}
-
+    );
+  }
 
   Widget _buildWelcomeHeader() {
     return Padding(
@@ -328,13 +386,32 @@ SliverToBoxAdapter(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(_greeting(), style: const TextStyle(fontSize: 13, color: _textGrey)),
+                Text(
+                  _greeting(),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
                 const SizedBox(height: 4),
                 Text(
                   _username,
-                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: _textDark),
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
                 ),
               ],
+            ),
+          ),
+          Consumer<ThemeProvider>(
+            builder: (context, themeProvider, child) => IconButton(
+              icon: Icon(
+                themeProvider.isDarkMode ? Icons.dark_mode : Icons.light_mode,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              onPressed: () => themeProvider.toggleTheme(),
             ),
           ),
           Material(
@@ -345,13 +422,22 @@ SliverToBoxAdapter(
               height: 48,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF818CF8), _violet],
+                gradient: LinearGradient(
+                  colors: [
+                    Color(0xFF818CF8),
+                    Theme.of(context).colorScheme.primary,
+                  ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 boxShadow: [
-                  BoxShadow(color: _violet.withOpacity(0.3), blurRadius: 12, offset: const Offset(0, 4)),
+                  BoxShadow(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.primary.withOpacity(0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
                 ],
               ),
               child: InkWell(
@@ -360,7 +446,11 @@ SliverToBoxAdapter(
                 child: Center(
                   child: Text(
                     _initials(),
-                    style: const TextStyle(color: _white, fontWeight: FontWeight.w800, fontSize: 16),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
+                    ),
                   ),
                 ),
               ),
@@ -386,19 +476,36 @@ SliverToBoxAdapter(
               margin: const EdgeInsets.only(right: 6),
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
               decoration: BoxDecoration(
-                color: active ? _violet : _white,
+                color: active
+                    ? Theme.of(context).colorScheme.primary
+                    : Theme.of(context).colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: active
-                    ? [BoxShadow(color: _violet.withOpacity(0.25), blurRadius: 12, offset: const Offset(0, 4))]
+                    ? [
+                        BoxShadow(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.primary.withOpacity(0.25),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ]
                     : [],
-                border: active ? null : Border.all(color: _border, width: 1),
+                border: active
+                    ? null
+                    : Border.all(
+                        color: Theme.of(context).colorScheme.outline,
+                        width: 1,
+                      ),
               ),
               child: Text(
                 _activityTabs[i],
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: active ? _white : _textGrey,
+                  color: active
+                      ? Theme.of(context).colorScheme.onPrimary
+                      : Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
             ),
@@ -414,11 +521,25 @@ SliverToBoxAdapter(
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: _textDark)),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
           if (action.isNotEmpty && onTap != null)
             GestureDetector(
               onTap: onTap,
-              child: Text(action, style: const TextStyle(fontSize: 13, color: _violet, fontWeight: FontWeight.w600)),
+              child: Text(
+                action,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Theme.of(context).colorScheme.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
         ],
       ),
@@ -426,7 +547,11 @@ SliverToBoxAdapter(
   }
 
   Widget _buildApplicationsList() {
-    final filtered = _filterIndex == 0 ? _applications : _applications.where((a) => a['status'] == _tabStatuses[_filterIndex]).toList();
+    final filtered = _filterIndex == 0
+        ? _applications
+        : _applications
+              .where((a) => a['status'] == _tabStatuses[_filterIndex])
+              .toList();
     return SizedBox(
       height: 130,
       child: ListView.builder(
@@ -455,7 +580,9 @@ SliverToBoxAdapter(
             onTap: tool.title == 'Interview Prep'
                 ? () {
                     Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const InterviewPrepScreen()),
+                      MaterialPageRoute(
+                        builder: (_) => const InterviewPrepScreen(),
+                      ),
                     );
                   }
                 : null,
@@ -473,21 +600,31 @@ class _ApplicationCard extends StatelessWidget {
 
   Color get _statusColor {
     switch (app['status']) {
-      case 'pending': return _appliedColor;
-      case 'accepted': return _acceptedColor;
-      case 'rejected': return _rejectedColor;
-      case 'interview': return _interviewColor;
-      default: return _appliedColor;
+      case 'pending':
+        return _appliedColor;
+      case 'accepted':
+        return _acceptedColor;
+      case 'rejected':
+        return _rejectedColor;
+      case 'interview':
+        return _interviewColor;
+      default:
+        return _appliedColor;
     }
   }
 
   String get _displayStatus {
     switch (app['status']) {
-      case 'pending': return 'Applied';
-      case 'accepted': return 'Accepted';
-      case 'rejected': return 'Rejected';
-      case 'interview': return 'Interview';
-      default: return app['status'];
+      case 'pending':
+        return 'Applied';
+      case 'accepted':
+        return 'Accepted';
+      case 'rejected':
+        return 'Rejected';
+      case 'interview':
+        return 'Interview';
+      default:
+        return app['status'];
     }
   }
 
@@ -498,9 +635,15 @@ class _ApplicationCard extends StatelessWidget {
       margin: const EdgeInsets.only(right: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: _white,
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(18),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 16, offset: const Offset(0, 4))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -510,21 +653,58 @@ class _ApplicationCard extends StatelessWidget {
               Container(
                 width: 36,
                 height: 36,
-                decoration: BoxDecoration(color: _statusColor.withOpacity(0.12), borderRadius: BorderRadius.circular(10)),
-                child: Center(child: Text(_getInitials(app['company_name']), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: _statusColor))),
+                decoration: BoxDecoration(
+                  color: _statusColor.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Center(
+                  child: Text(
+                    _getInitials(app['company_name']),
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: _statusColor,
+                    ),
+                  ),
+                ),
               ),
               const Spacer(),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                decoration: BoxDecoration(color: _statusColor.withOpacity(0.10), borderRadius: BorderRadius.circular(20)),
-                child: Text(_displayStatus, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: _statusColor)),
+                decoration: BoxDecoration(
+                  color: _statusColor.withOpacity(0.10),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  _displayStatus,
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    color: _statusColor,
+                  ),
+                ),
               ),
             ],
           ),
           const Spacer(),
-          Text(app['company_name'], style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _textDark), overflow: TextOverflow.ellipsis),
+          Text(
+            app['company_name'],
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
           const SizedBox(height: 2),
-          Text(app['job_title'], style: const TextStyle(fontSize: 11, color: _textGrey), overflow: TextOverflow.ellipsis),
+          Text(
+            app['job_title'],
+            style: TextStyle(
+              fontSize: 11,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
         ],
       ),
     );
@@ -547,9 +727,19 @@ class _TooltoUseCard extends StatelessWidget {
         margin: const EdgeInsets.only(right: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          gradient: LinearGradient(colors: tool.grad, begin: Alignment.topLeft, end: Alignment.bottomRight),
+          gradient: LinearGradient(
+            colors: tool.grad,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
           borderRadius: BorderRadius.circular(20),
-          boxShadow: [BoxShadow(color: tool.grad.first.withOpacity(0.30), blurRadius: 20, offset: const Offset(0, 8))],
+          boxShadow: [
+            BoxShadow(
+              color: tool.grad.first.withOpacity(0.30),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -557,13 +747,32 @@ class _TooltoUseCard extends StatelessWidget {
             Container(
               width: 38,
               height: 38,
-              decoration: BoxDecoration(color: Colors.white.withOpacity(0.20), borderRadius: BorderRadius.circular(12)),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.20),
+                borderRadius: BorderRadius.circular(12),
+              ),
               child: Icon(tool.icon, color: _white, size: 20),
             ),
             const Spacer(),
-            Text(tool.title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: _white), overflow: TextOverflow.ellipsis),
+            Text(
+              tool.title,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: _white,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
             const SizedBox(height: 3),
-            Text(tool.subtitle, style: TextStyle(fontSize: 10, color: Colors.white.withOpacity(0.75)), overflow: TextOverflow.ellipsis, maxLines: 2),
+            Text(
+              tool.subtitle,
+              style: TextStyle(
+                fontSize: 10,
+                color: Colors.white.withOpacity(0.75),
+              ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 2,
+            ),
           ],
         ),
       ),
@@ -584,9 +793,9 @@ class _AnnouncementCard extends StatelessWidget {
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
         padding: const EdgeInsets.all(24),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -594,31 +803,65 @@ class _AnnouncementCard extends StatelessWidget {
           children: [
             Center(
               child: Container(
-                width: 40, height: 4, 
-                decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.outline,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
             ),
             const SizedBox(height: 20),
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(color: a.typeColor.withOpacity(0.10), borderRadius: BorderRadius.circular(20)),
-                  child: Text(a.type.toUpperCase(), style: TextStyle(fontSize: 11, color: a.typeColor, fontWeight: FontWeight.bold)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: a.typeColor.withOpacity(0.10),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    a.type.toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: a.typeColor,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
                 const Spacer(),
-                Text(a.date, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                Text(
+                  a.date,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 16),
-            Text(a.title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF1A1D1E))),
+            Text(
+              a.title,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
             const SizedBox(height: 12),
             const Divider(),
             const SizedBox(height: 12),
             SingleChildScrollView(
               child: Text(
                 a.body,
-                style: const TextStyle(fontSize: 15, color: Color(0xFF4A4D4E), height: 1.6),
+                style: TextStyle(
+                  fontSize: 15,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  height: 1.6,
+                ),
               ),
             ),
             const SizedBox(height: 40), // Spacing at the bottom
@@ -636,9 +879,15 @@ class _AnnouncementCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(18),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 14, offset: const Offset(0, 4))],
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 14,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -646,7 +895,10 @@ class _AnnouncementCard extends StatelessWidget {
             Container(
               width: 4,
               height: 60,
-              decoration: BoxDecoration(color: a.typeColor, borderRadius: BorderRadius.circular(2)),
+              decoration: BoxDecoration(
+                color: a.typeColor,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -656,18 +908,53 @@ class _AnnouncementCard extends StatelessWidget {
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(color: a.typeColor.withOpacity(0.10), borderRadius: BorderRadius.circular(20)),
-                        child: Text(a.type, style: TextStyle(fontSize: 10, color: a.typeColor, fontWeight: FontWeight.w700)),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: a.typeColor.withOpacity(0.10),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          a.type,
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: a.typeColor,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ),
                       const Spacer(),
-                      Text(a.date, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                      Text(
+                        a.date,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 6),
-                  Text(a.title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF1A1D1E))),
+                  Text(
+                    a.title,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
                   const SizedBox(height: 4),
-                  Text(a.body, style: const TextStyle(fontSize: 12, color: Colors.grey, height: 1.5), maxLines: 2, overflow: TextOverflow.ellipsis),
+                  Text(
+                    a.body,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      height: 1.5,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ],
               ),
             ),
@@ -688,8 +975,14 @@ class _BottomBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: _white,
-        boxShadow: [BoxShadow(color: _blue.withOpacity(0.08), blurRadius: 20, offset: const Offset(0, -4))],
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        boxShadow: [
+          BoxShadow(
+            color: Theme.of(context).colorScheme.primary.withOpacity(0.08),
+            blurRadius: 20,
+            offset: const Offset(0, -4),
+          ),
+        ],
       ),
       child: SafeArea(
         top: false,
@@ -698,10 +991,30 @@ class _BottomBar extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _NavItem(icon: Icons.home_rounded, label: 'Home', active: currentIndex == 0, onTap: () => onTap(0)),
-              _NavItem(icon: Icons.work_outline_rounded, label: 'Internships', active: currentIndex == 1, onTap: () => onTap(1)),
-              _NavItem(icon: Icons.person_rounded, label: 'Profile', active: currentIndex == 2, onTap: () => onTap(2)),
-              _NavItem(icon: Icons.assignment_outlined, label: 'Surveys', active: currentIndex == 3, onTap: () => onTap(3)),
+              _NavItem(
+                icon: Icons.home_rounded,
+                label: 'Home',
+                active: currentIndex == 0,
+                onTap: () => onTap(0),
+              ),
+              _NavItem(
+                icon: Icons.work_outline_rounded,
+                label: 'Internships',
+                active: currentIndex == 1,
+                onTap: () => onTap(1),
+              ),
+              _NavItem(
+                icon: Icons.person_rounded,
+                label: 'Profile',
+                active: currentIndex == 2,
+                onTap: () => onTap(2),
+              ),
+              _NavItem(
+                icon: Icons.assignment_outlined,
+                label: 'Surveys',
+                active: currentIndex == 3,
+                onTap: () => onTap(3),
+              ),
             ],
           ),
         ),
@@ -716,59 +1029,79 @@ class _NavItem extends StatelessWidget {
   final bool active;
   final VoidCallback? onTap;
 
-  const _NavItem({required this.icon, required this.label, required this.active, this.onTap});
+  const _NavItem({
+    required this.icon,
+    required this.label,
+    required this.active,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) => InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: onTap ?? () {},
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              decoration: BoxDecoration(
-                color: active ? _blueL : Colors.transparent,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: active ? _blue : _textGrey, size: 22),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 10,
-                color: active ? _blue : _textGrey,
-                fontWeight: active ? FontWeight.w700 : FontWeight.w400,
-              ),
-            ),
-          ],
+    borderRadius: BorderRadius.circular(12),
+    onTap: onTap ?? () {},
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          decoration: BoxDecoration(
+            color: active
+                ? Theme.of(context).colorScheme.secondary.withOpacity(0.1)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(
+            icon,
+            color: active
+                ? Theme.of(context).colorScheme.secondary
+                : Theme.of(context).colorScheme.onSurfaceVariant,
+            size: 22,
+          ),
         ),
-      );
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            color: active
+                ? Theme.of(context).colorScheme.secondary
+                : Theme.of(context).colorScheme.onSurfaceVariant,
+            fontWeight: active ? FontWeight.w700 : FontWeight.w400,
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 // Helper to keep your UI colors consistent with your design
 Color _getLiveTypeColor(String? type) {
   switch (type) {
-    case 'Event': return const Color(0xFF8B5CF6);      // Violet
-    case 'Important': return const Color(0xFFEC4899);  // Pink
-    case 'News': return const Color(0xFF3B82F6);       // Blue
-    case 'Reminder': return const Color(0xFF059669);   // Green
-    default: return Colors.blueGrey;
+    case 'Event':
+      return const Color(0xFF8B5CF6); // Violet
+    case 'Important':
+      return const Color(0xFFEC4899); // Pink
+    case 'News':
+      return const Color(0xFF3B82F6); // Blue
+    case 'Reminder':
+      return const Color(0xFF059669); // Green
+    default:
+      return Colors.blueGrey;
   }
 }
 
 // Helper to turn database timestamps into readable strings
 String _formatTimeAgo(String? timestamp) {
   if (timestamp == null) return "Just now";
-  
+
   // Parse the UTC time from Supabase correctly
   DateTime postDate = DateTime.parse(timestamp).toLocal();
   DateTime now = DateTime.now();
-  
+
   // Use difference and take the absolute value to avoid negative numbers
   Duration diff = now.difference(postDate);
-  
+
   // If the difference is negative or very small, just say "Just now"
   if (diff.isNegative || diff.inSeconds < 60) {
     return "Just now";
@@ -792,15 +1125,25 @@ class AllAnnouncementsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FE), 
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        title: const Text('University Announcements', 
-          style: TextStyle(color: _textDark, fontWeight: FontWeight.bold, fontSize: 18)),
-        backgroundColor: Colors.white,
+        title: Text(
+          'University Announcements',
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
+        ),
+        backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
         elevation: 0,
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _textDark, size: 20),
+          icon: Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: Theme.of(context).colorScheme.onSurface,
+            size: 20,
+          ),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -811,7 +1154,7 @@ class AllAnnouncementsScreen extends StatelessWidget {
             .order('created_at', ascending: false),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator(color: _blue));
+            return const Center(child: CircularProgressIndicator());
           }
 
           final liveData = snapshot.data ?? [];
@@ -838,4 +1181,190 @@ class AllAnnouncementsScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+
+class AllApplicationsScreen extends StatefulWidget {
+  final int userId;
+
+  const AllApplicationsScreen({super.key, required this.userId});
+
+  @override
+  State<AllApplicationsScreen> createState() => _AllApplicationsScreenState();
+}
+
+class _AllApplicationsScreenState extends State<AllApplicationsScreen> {
+  final _db = Supabase.instance.client;
+  List<Map<String, dynamic>> _applications = [];
+  bool _isLoading = true;
+  RealtimeChannel? _subscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchApplications();
+    _setupRealtime();
+  }
+
+  @override
+  void dispose() {
+    if (_subscription != null) {
+      _db.removeChannel(_subscription!);
+    }
+    super.dispose();
+  }
+
+  Future<void> _fetchApplications() async {
+    try {
+      final appsRows = await _db
+          .from('Job_applications')
+          .select('*, Job_postings!inner(title, Company_profile!inner(name))')
+          .eq('student_id', widget.userId)
+          .order('applied_at', ascending: false);
+
+      final parsed = appsRows.map((row) => {
+        'job_title': row['Job_postings']['title'] as String,
+        'company_name': row['Job_postings']['Company_profile']['name'] as String,
+        'status': row['status'] as String,
+      }).toList();
+
+      if (mounted) {
+        setState(() {
+          _applications = parsed;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // Listens to live database changes for this specific user
+  void _setupRealtime() {
+    _subscription = _db.channel('public:Job_applications').onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'Job_applications',
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq,
+        column: 'student_id',
+        value: widget.userId,
+      ),
+      callback: (payload) {
+        _fetchApplications();
+      },
+    ).subscribe();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
+    
+    return Scaffold(
+      backgroundColor: theme.surface,
+      appBar: AppBar(
+        title: Text(
+          'My Applications',
+          style: TextStyle(color: theme.onSurface, fontWeight: FontWeight.bold, fontSize: 18),
+        ),
+        backgroundColor: theme.surfaceContainerHighest,
+        elevation: 0,
+        centerTitle: true,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_ios_new_rounded, color: theme.onSurface, size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: _isLoading 
+          ? Center(child: CircularProgressIndicator(color: theme.primary))
+          : _applications.isEmpty
+          ? Center(
+              child: Text("No applications found.", 
+              style: TextStyle(color: theme.onSurfaceVariant)))
+          : ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: _applications.length,
+              itemBuilder: (context, index) {
+                final app = _applications[index];
+                
+                // Determine color based on status
+                Color statusCol;
+                switch (app['status']) {
+                  case 'pending': statusCol = const Color(0xFF3B82F6); break;
+                  case 'accepted': statusCol = const Color(0xFF10B981); break;
+                  case 'rejected': statusCol = const Color(0xFFEF4444); break;
+                  case 'interview': statusCol = const Color(0xFF7C3AED); break;
+                  default: statusCol = const Color(0xFF3B82F6);
+                }
+
+                // Generate Initials
+                final initials = app['company_name'].toString().trim().split(' ')
+                    .where((e) => e.isNotEmpty).take(2)
+                    .map((e) => e[0].toUpperCase()).join();
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: theme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 44, height: 44,
+                        decoration: BoxDecoration(
+                          color: statusCol.withOpacity(0.12), 
+                          borderRadius: BorderRadius.circular(12)
+                        ),
+                        child: Center(child: Text(initials, 
+                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: statusCol))),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(app['job_title'], 
+                                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: theme.onSurface),
+                                overflow: TextOverflow.ellipsis),
+                            const SizedBox(height: 2),
+                            Text(app['company_name'], 
+                                style: TextStyle(fontSize: 13, color: theme.onSurfaceVariant),
+                                overflow: TextOverflow.ellipsis),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: statusCol.withOpacity(0.10), 
+                          borderRadius: BorderRadius.circular(20)
+                        ),
+                        child: Text(
+                          app['status'].toString().toUpperCase(), 
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: statusCol)
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+    );
+  }
+}
+// ─── DECORATIVE BLOB ──────────────────────
+class _Blob extends StatelessWidget {
+  final double size;
+  final Color color;
+  const _Blob({required this.size, required this.color});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: size,
+    height: size,
+    decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+  );
 }

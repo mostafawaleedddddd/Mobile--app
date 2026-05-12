@@ -4,19 +4,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 // ─────────────────────────────────────────────
 // COLORS
 // ─────────────────────────────────────────────
-const _white     = Colors.white;
-const _bg        = Color(0xFFF5F8FF);
-const _textDark  = Color(0xFF1A1A2E);
-const _textGrey  = Color(0xFF64748B);
-const _border    = Color(0xFFE2E8F0);
+const _white = Colors.white; 
 
-// accent palette — one per section
+// accent palette — one per section 
 const _accentBlue   = Color(0xFF3B82F6);
 const _accentPurple = Color(0xFF8B5CF6);
 const _accentTeal   = Color(0xFF0EA5E9);
 const _accentGreen  = Color(0xFF10B981);
 const _accentOrange = Color(0xFFF59E0B);
-//const _accentPink   = Color(0xFFEC4899);
 const _accentIndigo = Color(0xFF6366F1);
 
 class SurveyScreen extends StatefulWidget {
@@ -251,10 +246,12 @@ class _SurveyScreenState extends State<SurveyScreen>
   // ── build ────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    if (_submitted) return _buildSuccess();
+    final theme = Theme.of(context).colorScheme;
+
+    if (_submitted) return _buildSuccess(theme);
 
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: theme.surface,
       body: Stack(
         children: [
           // subtle background decoration
@@ -266,7 +263,7 @@ class _SurveyScreenState extends State<SurveyScreen>
           SafeArea(
             child: Column(
               children: [
-                _buildTopBar(),
+                _buildTopBar(theme),
                 Expanded(
                   child: SingleChildScrollView(
                     physics: const BouncingScrollPhysics(),
@@ -274,13 +271,13 @@ class _SurveyScreenState extends State<SurveyScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildInternshipPicker(),
-                        if (_alreadySubmitted)   _buildAlreadySubmittedBanner()
+                        _buildInternshipPicker(theme),
+                        if (_alreadySubmitted)   _buildAlreadySubmittedBanner(theme)
                         else if (_selectedInternship != null) ...[
-                          _buildSectionA(),
-                          _buildSectionB(),
-                          _buildSectionC(),
-                          _buildSectionD(),
+                          _buildSectionA(theme),
+                          _buildSectionB(theme),
+                          _buildSectionC(theme),
+                          _buildSectionD(theme),
                           const SizedBox(height: 16),
                           _buildSubmitButton(),
                         ],
@@ -303,11 +300,11 @@ class _SurveyScreenState extends State<SurveyScreen>
   }
 
   // ── top bar ─────────────────────────────────
-  Widget _buildTopBar() {
+  Widget _buildTopBar(ColorScheme theme) {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-      decoration: const BoxDecoration(color: _white,
-          boxShadow: [BoxShadow(color: Color(0x0A000000), blurRadius: 8, offset: Offset(0, 2))]),
+      decoration: BoxDecoration(color: theme.surfaceContainerHighest,
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8, offset: const Offset(0, 2))]),
       child: Row(children: [
         Container(
           width: 42, height: 42,
@@ -318,19 +315,19 @@ class _SurveyScreenState extends State<SurveyScreen>
           child: const Icon(Icons.assignment_turned_in_rounded, color: _white, size: 22),
         ),
         const SizedBox(width: 12),
-        Column(crossAxisAlignment: CrossAxisAlignment.start, children: const [
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('Internship Survey',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800,
-                  color: _textDark, letterSpacing: -0.3)),
+                  color: theme.onSurface, letterSpacing: -0.3)),
           Text('Share your experience to help others',
-              style: TextStyle(fontSize: 11.5, color: _textGrey)),
+              style: TextStyle(fontSize: 11.5, color: theme.onSurfaceVariant)),
         ]),
       ]),
     );
   }
 
   // ── internship picker ───────────────────────
-  Widget _buildInternshipPicker() {
+  Widget _buildInternshipPicker(ColorScheme theme) {
     return _SurveyCard(
       accent: _accentBlue,
       icon: Icons.business_center_rounded,
@@ -341,17 +338,17 @@ class _SurveyScreenState extends State<SurveyScreen>
           // ── Search field ──
           TextField(
             controller: _searchCtrl,
-            style: const TextStyle(fontSize: 14, color: _textDark),
+            style: TextStyle(fontSize: 14, color: theme.onSurface),
             decoration: InputDecoration(
               hintText: 'Type a company or internship name...',
-              hintStyle: const TextStyle(color: Color(0xFFADB5BD), fontSize: 13),
+              hintStyle: TextStyle(color: theme.onSurfaceVariant.withOpacity(0.6), fontSize: 13),
               filled: true,
-              fillColor: const Color(0xFFF8FAFC),
+              fillColor: theme.surface,
               contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF94A3B8), size: 18),
+              prefixIcon: Icon(Icons.search_rounded, color: theme.onSurfaceVariant.withOpacity(0.8), size: 18),
               suffixIcon: _searchCtrl.text.isNotEmpty
                   ? IconButton(
-                      icon: const Icon(Icons.close_rounded, size: 16, color: Color(0xFF94A3B8)),
+                      icon: Icon(Icons.close_rounded, size: 16, color: theme.onSurfaceVariant.withOpacity(0.8)),
                       onPressed: () {
                         _searchCtrl.clear();
                         setState(() {
@@ -363,10 +360,10 @@ class _SurveyScreenState extends State<SurveyScreen>
                   : null,
               border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: _border)),
+                  borderSide: BorderSide(color: theme.outline)),
               enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: _border)),
+                  borderSide: BorderSide(color: theme.outline)),
               focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(color: _accentBlue, width: 1.8)),
@@ -375,13 +372,13 @@ class _SurveyScreenState extends State<SurveyScreen>
 
           // ── Loading indicator ──
           if (_searchLoading)
-            const Padding(
-              padding: EdgeInsets.only(top: 10),
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
               child: Row(children: [
-                SizedBox(width: 14, height: 14,
+                const SizedBox(width: 14, height: 14,
                     child: CircularProgressIndicator(strokeWidth: 2, color: _accentBlue)),
-                SizedBox(width: 8),
-                Text('Loading options...', style: TextStyle(fontSize: 12, color: _textGrey)),
+                const SizedBox(width: 8),
+                Text('Loading options...', style: TextStyle(fontSize: 12, color: theme.onSurfaceVariant)),
               ]),
             ),
 
@@ -391,9 +388,9 @@ class _SurveyScreenState extends State<SurveyScreen>
               margin: const EdgeInsets.only(top: 6),
               constraints: const BoxConstraints(maxHeight: 220),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: theme.surface,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: _border),
+                border: Border.all(color: theme.outline),
                 boxShadow: [
                   BoxShadow(color: _accentBlue.withOpacity(0.08),
                       blurRadius: 14, offset: const Offset(0, 4))
@@ -416,8 +413,8 @@ class _SurveyScreenState extends State<SurveyScreen>
                         decoration: BoxDecoration(
                           border: isLast
                               ? null
-                              : const Border(
-                                  bottom: BorderSide(color: _border, width: 0.8)),
+                              : Border(
+                                  bottom: BorderSide(color: theme.outline, width: 0.8)),
                         ),
                         child: Row(
                           children: [
@@ -436,15 +433,15 @@ class _SurveyScreenState extends State<SurveyScreen>
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(opt.company,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                           fontSize: 13,
                                           fontWeight: FontWeight.w700,
-                                          color: _textDark),
+                                          color: theme.onSurface),
                                       overflow: TextOverflow.ellipsis),
                                   if (opt.role.isNotEmpty)
                                     Text(opt.role,
-                                        style: const TextStyle(
-                                            fontSize: 11, color: _textGrey),
+                                        style: TextStyle(
+                                            fontSize: 11, color: theme.onSurfaceVariant),
                                         overflow: TextOverflow.ellipsis),
                                 ],
                               ),
@@ -475,7 +472,7 @@ class _SurveyScreenState extends State<SurveyScreen>
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text('No matches found.',
-                  style: const TextStyle(fontSize: 12, color: _textGrey)),
+                  style: TextStyle(fontSize: 12, color: theme.onSurfaceVariant)),
             ),
 
           // ── Selected confirmation ──
@@ -507,13 +504,13 @@ class _SurveyScreenState extends State<SurveyScreen>
           ],
 
           if (_isCheckingDuplicate)
-            const Padding(
-              padding: EdgeInsets.only(top: 10),
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
               child: Row(children: [
-                SizedBox(width: 14, height: 14,
+                const SizedBox(width: 14, height: 14,
                     child: CircularProgressIndicator(strokeWidth: 2, color: _accentBlue)),
-                SizedBox(width: 8),
-                Text('Checking...', style: TextStyle(fontSize: 12, color: _textGrey)),
+                const SizedBox(width: 8),
+                Text('Checking...', style: TextStyle(fontSize: 12, color: theme.onSurfaceVariant)),
               ]),
             ),
         ],
@@ -544,7 +541,8 @@ class _SurveyScreenState extends State<SurveyScreen>
       default:        return 'COMPANY';
     }
   }
-  Widget _buildAlreadySubmittedBanner() {
+
+  Widget _buildAlreadySubmittedBanner(ColorScheme theme) {
     return Container(
       margin: const EdgeInsets.only(top: 12),
       padding: const EdgeInsets.all(16),
@@ -558,28 +556,29 @@ class _SurveyScreenState extends State<SurveyScreen>
             decoration: BoxDecoration(color: _accentOrange.withOpacity(0.15), shape: BoxShape.circle),
             child: const Icon(Icons.info_rounded, color: _accentOrange, size: 20)),
         const SizedBox(width: 12),
-        const Expanded(child: Text(
+        Expanded(child: Text(
           'You already submitted a survey for this internship.',
-          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _textDark),
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: theme.onSurface),
         )),
       ]),
     );
   }
 
   // ── SECTION A: General Experience ───────────
-  Widget _buildSectionA() {
+  Widget _buildSectionA(ColorScheme theme) {
     return _SurveyCard(
       accent: _accentPurple,
       icon: Icons.star_rounded,
       title: 'A — General Experience',
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        _starQuestion('Overall Experience', _overallRating, _accentPurple,
+        _starQuestion('Overall Experience', _overallRating, _accentPurple, theme,
             (v) => setState(() => _overallRating = v)),
         const SizedBox(height: 18),
         _yesNoQuestion(
           'Would you recommend this internship to a friend?',
           _wouldRecommend,
           _accentPurple,
+          theme,
           (v) => setState(() => _wouldRecommend = v),
         ),
       ]),
@@ -587,19 +586,19 @@ class _SurveyScreenState extends State<SurveyScreen>
   }
 
   // ── SECTION B: Work Environment ─────────────
-  Widget _buildSectionB() {
+  Widget _buildSectionB(ColorScheme theme) {
     return _SurveyCard(
       accent: _accentTeal,
       icon: Icons.groups_rounded,
       title: 'B — Work Environment',
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        _starQuestion('Mentor Quality', _mentorQuality, _accentTeal,
+        _starQuestion('Mentor Quality', _mentorQuality, _accentTeal, theme,
             (v) => setState(() => _mentorQuality = v)),
         const SizedBox(height: 16),
-        _starQuestion('Communication', _communication, _accentTeal,
+        _starQuestion('Communication', _communication, _accentTeal, theme,
             (v) => setState(() => _communication = v)),
         const SizedBox(height: 18),
-        _qLabel('Work Mode'),
+        _qLabel('Work Mode', theme),
         const SizedBox(height: 10),
         Row(children: ['Remote','Onsite','Hybrid'].map((mode) {
           final sel = _workMode == mode;
@@ -613,11 +612,11 @@ class _SurveyScreenState extends State<SurveyScreen>
                 decoration: BoxDecoration(
                   color: sel ? _accentTeal : _accentTeal.withOpacity(0.07),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: sel ? _accentTeal : _border),
+                  border: Border.all(color: sel ? _accentTeal : theme.outline),
                 ),
                 child: Text(mode, textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
-                        color: sel ? _white : _textGrey)),
+                        color: sel ? _white : theme.onSurfaceVariant)),
               ),
             ),
           ));
@@ -627,7 +626,7 @@ class _SurveyScreenState extends State<SurveyScreen>
   }
 
   // ── SECTION C: Tasks & Feedback ───────────────
-  Widget _buildSectionC() {
+  Widget _buildSectionC(ColorScheme theme) {
     return _SurveyCard(
       accent: _accentGreen,
       icon: Icons.build_rounded,
@@ -635,31 +634,31 @@ class _SurveyScreenState extends State<SurveyScreen>
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _yesNoQuestion(
           'Did the tasks align with your expectations?',
-          _tasksAligned, _accentGreen,
+          _tasksAligned, _accentGreen, theme,
           (v) => setState(() => _tasksAligned = v),
         ),
         const SizedBox(height: 18),
-        _qLabel('Suggestions for Improvement (optional)'),
+        _qLabel('Suggestions for Improvement (optional)', theme),
         const SizedBox(height: 8),
-        _textField(_improvementCtrl, 'What could the company improve for interns?', maxLines: 3, maxLength: 500),
+        _textField(_improvementCtrl, 'What could the company improve for interns?', theme, maxLines: 3, maxLength: 500),
       ]),
     );
   }
 
   // ── SECTION D: Open Feedback ──────────────────
-  Widget _buildSectionD() {
+  Widget _buildSectionD(ColorScheme theme) {
     return _SurveyCard(
       accent: _accentIndigo,
       icon: Icons.chat_bubble_rounded,
       title: 'D — Open Feedback',
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        _qLabel('What was the best part of your internship?'),
+        _qLabel('What was the best part of your internship?', theme),
         const SizedBox(height: 8),
-        _textField(_bestPartCtrl, 'Share what you loved...', maxLines: 3),
+        _textField(_bestPartCtrl, 'Share what you loved...', theme, maxLines: 3),
         const SizedBox(height: 18),
-        _qLabel('What was your biggest challenge?'),
+        _qLabel('What was your biggest challenge?', theme),
         const SizedBox(height: 8),
-        _textField(_biggestChalCtrl, 'Describe a challenge you faced...', maxLines: 3),
+        _textField(_biggestChalCtrl, 'Describe a challenge you faced...', theme, maxLines: 3),
       ]),
     );
   }
@@ -687,7 +686,7 @@ class _SurveyScreenState extends State<SurveyScreen>
         child: InkWell(
           onTap: _isSubmitting ? null : _submit,
           borderRadius: BorderRadius.circular(18),
-          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: const [
+          child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
             Icon(Icons.send_rounded, color: _white, size: 20),
             SizedBox(width: 10),
             Text('Submit Survey', style: TextStyle(
@@ -700,9 +699,9 @@ class _SurveyScreenState extends State<SurveyScreen>
   }
 
   // ── success screen ───────────────────────────
-  Widget _buildSuccess() {
+  Widget _buildSuccess(ColorScheme theme) {
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: theme.surface,
       body: Center(
         child: ScaleTransition(
           scale: _successAnim,
@@ -728,10 +727,10 @@ class _SurveyScreenState extends State<SurveyScreen>
                     style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800,
                         color: _accentGreen, letterSpacing: -0.5)),
                 const SizedBox(height: 10),
-                const Text(
+                Text(
                   'Thank you for sharing your experience.\nYour feedback helps future interns!',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 15, color: _textGrey, height: 1.55),
+                  style: TextStyle(fontSize: 15, color: theme.onSurfaceVariant, height: 1.55),
                 ),
                 const SizedBox(height: 36),
                 GestureDetector(
@@ -772,9 +771,9 @@ class _SurveyScreenState extends State<SurveyScreen>
 
   // ── reusable question widgets ─────────────────
 
-  Widget _starQuestion(String label, int value, Color accent, ValueChanged<int> onChanged) {
+  Widget _starQuestion(String label, int value, Color accent, ColorScheme theme, ValueChanged<int> onChanged) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      _qLabel(label),
+      _qLabel(label, theme),
       const SizedBox(height: 8),
       Row(children: List.generate(5, (i) {
         final filled = i < value;
@@ -785,7 +784,7 @@ class _SurveyScreenState extends State<SurveyScreen>
             margin: const EdgeInsets.only(right: 6),
             child: Icon(
               filled ? Icons.star_rounded : Icons.star_outline_rounded,
-              color: filled ? accent : _border,
+              color: filled ? accent : theme.outline,
               size: 34,
             ),
           ),
@@ -800,19 +799,19 @@ class _SurveyScreenState extends State<SurveyScreen>
     ]);
   }
 
-  Widget _yesNoQuestion(String label, bool value, Color accent, ValueChanged<bool> onChanged) {
+  Widget _yesNoQuestion(String label, bool value, Color accent, ColorScheme theme, ValueChanged<bool> onChanged) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      _qLabel(label),
+      _qLabel(label, theme),
       const SizedBox(height: 10),
       Row(children: [
-        _choiceBtn('Yes', value == true, accent, () => onChanged(true)),
+        _choiceBtn('Yes', value == true, accent, theme, () => onChanged(true)),
         const SizedBox(width: 10),
-        _choiceBtn('No', value == false, accent, () => onChanged(false)),
+        _choiceBtn('No', value == false, accent, theme, () => onChanged(false)),
       ]),
     ]);
   }
 
-  Widget _choiceBtn(String label, bool active, Color accent, VoidCallback onTap) {
+  Widget _choiceBtn(String label, bool active, Color accent, ColorScheme theme, VoidCallback onTap) {
     return Expanded(
       child: GestureDetector(
         onTap: onTap,
@@ -822,7 +821,7 @@ class _SurveyScreenState extends State<SurveyScreen>
           decoration: BoxDecoration(
             color: active ? accent : accent.withOpacity(0.07),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: active ? accent : _border),
+            border: Border.all(color: active ? accent : theme.outline),
             boxShadow: active
                 ? [BoxShadow(color: accent.withOpacity(0.25), blurRadius: 10, offset: const Offset(0, 3))]
                 : [],
@@ -831,40 +830,38 @@ class _SurveyScreenState extends State<SurveyScreen>
             Icon(active
                 ? (label == 'Yes' ? Icons.thumb_up_rounded : Icons.thumb_down_rounded)
                 : (label == 'Yes' ? Icons.thumb_up_outlined : Icons.thumb_down_outlined),
-                size: 16, color: active ? _white : _textGrey),
+                size: 16, color: active ? _white : theme.onSurfaceVariant),
             const SizedBox(width: 6),
             Text(label, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700,
-                color: active ? _white : _textGrey)),
+                color: active ? _white : theme.onSurfaceVariant)),
           ]),
         ),
       ),
     );
   }
 
-  Widget _qLabel(String text) => Text(text,
-      style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: _textDark, height: 1.4));
+  Widget _qLabel(String text, ColorScheme theme) => Text(text,
+      style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: theme.onSurface, height: 1.4));
 
   
-  Widget _textField(TextEditingController ctrl, String hint, {int maxLines = 1, int? maxLength}) {
+  Widget _textField(TextEditingController ctrl, String hint, ColorScheme theme, {int maxLines = 1, int? maxLength}) {
     return TextField(
       controller: ctrl,
       maxLines: maxLines,
       maxLength: maxLength,
-      style: const TextStyle(fontSize: 13.5, color: _textDark),
+      style: TextStyle(fontSize: 13.5, color: theme.onSurface),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(color: Color(0xFFADB5BD), fontSize: 13),
-        filled: true, fillColor: const Color(0xFFF8FAFC),
+        hintStyle: TextStyle(color: theme.onSurfaceVariant.withOpacity(0.6), fontSize: 13),
+        filled: true, fillColor: theme.surface,
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        counterStyle: const TextStyle(fontSize: 11, color: _textGrey),
-        border:        OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _border)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _border)),
+        counterStyle: TextStyle(fontSize: 11, color: theme.onSurfaceVariant),
+        border:        OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: theme.outline)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: theme.outline)),
         focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _accentBlue, width: 1.8)),
       ),
     );
   }
-
- 
 
   String _starLabel(int v) =>
       ['', '😞 Poor', '😕 Fair', '😊 Good', '😄 Great', '🤩 Excellent'][v];
@@ -888,10 +885,11 @@ class _SurveyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
     return Container(
       margin: const EdgeInsets.only(top: 16),
       decoration: BoxDecoration(
-        color: _white,
+        color: theme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(color: accent.withOpacity(0.08), blurRadius: 20,
@@ -927,7 +925,6 @@ class _SurveyCard extends StatelessWidget {
     );
   }
 }
-
 
 class _Circle extends StatelessWidget {
   final double size;

@@ -1,12 +1,6 @@
 import 'package:flutter/material.dart';
 
 const _blue = Color(0xFF3B82F6);
-const _blueLight = Color(0xFFEFF6FF);
-const _bluePale = Color(0xFFF0F7FF);
-const _textDark = Color(0xFF1E293B);
-const _textGrey = Color(0xFF64748B);
-const _border = Color(0xFFE2E8F0);
-const _white = Colors.white;
 const _green = Color(0xFF10B981);
 
 class BehavioralQuestionsScreen extends StatefulWidget {
@@ -48,8 +42,10 @@ class _BehavioralQuestionsScreenState extends State<BehavioralQuestionsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
+
     return Scaffold(
-      backgroundColor: _bluePale,
+      backgroundColor: theme.surface,
       body: Stack(
         children: [
           Positioned(
@@ -82,7 +78,7 @@ class _BehavioralQuestionsScreenState extends State<BehavioralQuestionsScreen> {
                           width: 40,
                           height: 40,
                           decoration: BoxDecoration(
-                            color: _white,
+                            color: theme.surfaceContainerHighest,
                             borderRadius: BorderRadius.circular(12),
                             boxShadow: [
                               BoxShadow(
@@ -92,15 +88,15 @@ class _BehavioralQuestionsScreenState extends State<BehavioralQuestionsScreen> {
                               )
                             ],
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.arrow_back_ios_new_rounded,
-                            color: _textDark,
+                            color: theme.onSurface,
                             size: 16,
                           ),
                         ),
                       ),
                       const SizedBox(width: 14),
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -109,13 +105,13 @@ class _BehavioralQuestionsScreenState extends State<BehavioralQuestionsScreen> {
                               style: TextStyle(
                                 fontSize: 22,
                                 fontWeight: FontWeight.w800,
-                                color: _textDark,
+                                color: theme.onSurface,
                                 letterSpacing: -0.3,
                               ),
                             ),
                             Text(
                               'Practice common behavioral questions',
-                              style: TextStyle(fontSize: 12, color: _textGrey),
+                              style: TextStyle(fontSize: 12, color: theme.onSurfaceVariant),
                             ),
                           ],
                         ),
@@ -160,6 +156,8 @@ class _QuestionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: GestureDetector(
@@ -167,7 +165,7 @@ class _QuestionCard extends StatelessWidget {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 300),
           decoration: BoxDecoration(
-            color: _white,
+            color: theme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
@@ -187,10 +185,10 @@ class _QuestionCard extends StatelessWidget {
                     Expanded(
                       child: Text(
                         question['question'] as String,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
-                          color: _textDark,
+                          color: theme.onSurface,
                           height: 1.5,
                         ),
                         maxLines: isExpanded ? null : 2,
@@ -211,18 +209,18 @@ class _QuestionCard extends StatelessWidget {
                 ),
               ),
               if (isExpanded) ...[
-                const Divider(color: _border, height: 1),
+                Divider(color: theme.outline, height: 1),
                 Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Tips:',
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
-                          color: _textDark,
+                          color: theme.onSurface,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -240,9 +238,9 @@ class _QuestionCard extends StatelessWidget {
                             Expanded(
                               child: Text(
                                 tip,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 12,
-                                  color: _textGrey,
+                                  color: theme.onSurfaceVariant,
                                   height: 1.4,
                                 ),
                               ),
@@ -255,7 +253,7 @@ class _QuestionCard extends StatelessWidget {
                         width: double.infinity,
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: _blueLight,
+                          color: _blue.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: _blue.withOpacity(0.2)),
                         ),
@@ -273,9 +271,9 @@ class _QuestionCard extends StatelessWidget {
                             const SizedBox(height: 6),
                             Text(
                               question['example'] as String,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12,
-                                color: _textGrey,
+                                color: theme.onSurfaceVariant,
                                 height: 1.5,
                               ),
                             ),

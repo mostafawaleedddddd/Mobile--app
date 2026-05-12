@@ -6,11 +6,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:camera/camera.dart';
 
 const _blue = Color(0xFF3B82F6);
-const _bluePale = Color(0xFFF0F7FF);
-const _textDark = Color(0xFF1E293B);
-const _textGrey = Color(0xFF64748B);
-const _border = Color(0xFFE2E8F0);
-const _white = Colors.white;
 
 class MockInterviewRecorderScreen extends StatefulWidget {
   final String title;
@@ -141,15 +136,17 @@ class _MockInterviewRecorderScreenState extends State<MockInterviewRecorderScree
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
+
     return Scaffold(
-      backgroundColor: _bluePale,
+      backgroundColor: theme.surface,
       appBar: AppBar(
-        backgroundColor: _white,
+        backgroundColor: theme.surfaceContainerHighest,
         elevation: 0,
-        iconTheme: const IconThemeData(color: _textDark),
+        iconTheme: IconThemeData(color: theme.onSurface),
         title: Text(
           'Interview Recorder',
-          style: const TextStyle(color: _textDark, fontWeight: FontWeight.w700),
+          style: TextStyle(color: theme.onSurface, fontWeight: FontWeight.w700),
         ),
         centerTitle: false,
       ),
@@ -161,9 +158,9 @@ class _MockInterviewRecorderScreenState extends State<MockInterviewRecorderScree
             children: [
               Container(
                 decoration: BoxDecoration(
-                  color: _white,
+                  color: theme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: _border),
+                  border: Border.all(color: theme.outline),
                   boxShadow: [
                     BoxShadow(
                       color: _blue.withOpacity(0.06),
@@ -179,7 +176,10 @@ class _MockInterviewRecorderScreenState extends State<MockInterviewRecorderScree
                       height: 120,
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
-                          colors: [widget.color.withOpacity(0.18), widget.color.withOpacity(0.06)],
+                          colors: [
+                            widget.color.withOpacity(0.18),
+                            widget.color.withOpacity(0.06)
+                          ],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
@@ -205,16 +205,20 @@ class _MockInterviewRecorderScreenState extends State<MockInterviewRecorderScree
                               children: [
                                 Text(
                                   widget.title,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w800,
-                                    color: _textDark,
+                                    color: theme.onSurface,
                                   ),
                                 ),
                                 const SizedBox(height: 6),
                                 Text(
                                   widget.description,
-                                  style: const TextStyle(fontSize: 13, color: _textGrey, height: 1.4),
+                                  style: TextStyle(
+                                    fontSize: 13, 
+                                    color: theme.onSurfaceVariant, 
+                                    height: 1.4
+                                  ),
                                 ),
                               ],
                             ),
@@ -226,10 +230,14 @@ class _MockInterviewRecorderScreenState extends State<MockInterviewRecorderScree
                       padding: const EdgeInsets.all(18),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
+                        children: [
                           Text(
                             'Record yourself with video and review your last take. Use this flow to practice interview responses, body language, and presence.',
-                            style: TextStyle(fontSize: 13.5, color: _textGrey, height: 1.5),
+                            style: TextStyle(
+                              fontSize: 13.5, 
+                              color: theme.onSurfaceVariant, 
+                              height: 1.5
+                            ),
                           ),
                         ],
                       ),
@@ -246,6 +254,7 @@ class _MockInterviewRecorderScreenState extends State<MockInterviewRecorderScree
                   label: Text(_recordButtonText),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _blue,
+                    foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),

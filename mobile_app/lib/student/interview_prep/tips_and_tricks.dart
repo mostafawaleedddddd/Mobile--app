@@ -1,11 +1,6 @@
 import 'package:flutter/material.dart';
 
 const _blue = Color(0xFF3B82F6);
-const _bluePale = Color(0xFFF0F7FF);
-const _textDark = Color(0xFF1E293B);
-const _textGrey = Color(0xFF64748B);
-const _border = Color(0xFFE2E8F0);
-const _white = Colors.white;
 const _amber = Color(0xFFF59E0B);
 
 class TipsAndTricksScreen extends StatefulWidget {
@@ -89,8 +84,10 @@ class _TipsAndTricksScreenState extends State<TipsAndTricksScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
+
     return Scaffold(
-      backgroundColor: _bluePale,
+      backgroundColor: theme.surface,
       body: Stack(
         children: [
           Positioned(
@@ -123,7 +120,7 @@ class _TipsAndTricksScreenState extends State<TipsAndTricksScreen> {
                           width: 40,
                           height: 40,
                           decoration: BoxDecoration(
-                            color: _white,
+                            color: theme.surfaceContainerHighest,
                             borderRadius: BorderRadius.circular(12),
                             boxShadow: [
                               BoxShadow(
@@ -133,15 +130,15 @@ class _TipsAndTricksScreenState extends State<TipsAndTricksScreen> {
                               )
                             ],
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.arrow_back_ios_new_rounded,
-                            color: _textDark,
+                            color: theme.onSurface,
                             size: 16,
                           ),
                         ),
                       ),
                       const SizedBox(width: 14),
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -150,13 +147,13 @@ class _TipsAndTricksScreenState extends State<TipsAndTricksScreen> {
                               style: TextStyle(
                                 fontSize: 22,
                                 fontWeight: FontWeight.w800,
-                                color: _textDark,
+                                color: theme.onSurface,
                                 letterSpacing: -0.3,
                               ),
                             ),
                             Text(
                               'Interview strategies and best practices',
-                              style: TextStyle(fontSize: 12, color: _textGrey),
+                              style: TextStyle(fontSize: 12, color: theme.onSurfaceVariant),
                             ),
                           ],
                         ),
@@ -201,6 +198,8 @@ class _TipCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: GestureDetector(
@@ -208,7 +207,7 @@ class _TipCard extends StatelessWidget {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 300),
           decoration: BoxDecoration(
-            color: _white,
+            color: theme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
@@ -245,18 +244,18 @@ class _TipCard extends StatelessWidget {
                         children: [
                           Text(
                             tip['title'] as String,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
-                              color: _textDark,
+                              color: theme.onSurface,
                             ),
                           ),
                           const SizedBox(height: 2),
                           Text(
                             tip['description'] as String,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
-                              color: _textGrey,
+                              color: theme.onSurfaceVariant,
                             ),
                           ),
                         ],
@@ -274,7 +273,7 @@ class _TipCard extends StatelessWidget {
                 ),
               ),
               if (isExpanded) ...[
-                const Divider(color: _border, height: 1),
+                Divider(color: theme.outline, height: 1),
                 Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
@@ -302,9 +301,9 @@ class _TipCard extends StatelessWidget {
                             Expanded(
                               child: Text(
                                 item,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 13,
-                                  color: _textGrey,
+                                  color: theme.onSurfaceVariant,
                                   height: 1.5,
                                 ),
                               ),

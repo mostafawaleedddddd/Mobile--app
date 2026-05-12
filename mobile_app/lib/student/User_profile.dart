@@ -14,13 +14,8 @@ import 'UserRole.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 // ─── COLORS ────────────────────────────
-const _blue      = Color(0xFF3B82F6);
-const _blueLight = Color(0xFFEFF6FF);
-const _bluePale  = Color(0xFFF0F7FF);
-const _textDark  = Color(0xFF1E293B);
-const _textGrey  = Color(0xFF64748B);
-const _border    = Color(0xFFE2E8F0);
-const _white     = Colors.white;
+const _blue  = Color(0xFF3B82F6);
+const _white = Colors.white;
 
 // ─── DATE HELPER ────────────────────────
 String _formatFullDate(String? raw) {
@@ -101,6 +96,7 @@ Future<String?> pickFullDate(
     context: context,
     builder: (ctx) => StatefulBuilder(
       builder: (ctx, ss) {
+        final theme = Theme.of(ctx).colorScheme;
         final daysInMonth = DateUtils.getDaysInMonth(sel.year, sel.month);
 
         bool monthDisabled(int year, int month) {
@@ -119,6 +115,7 @@ Future<String?> pickFullDate(
         }
 
         return AlertDialog(
+          backgroundColor: theme.surfaceContainerHighest,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           contentPadding: const EdgeInsets.all(16),
           content: SizedBox(
@@ -139,7 +136,7 @@ Future<String?> pickFullDate(
                         }),
                       ),
                       Text('${sel.year}',
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: _textDark)),
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: theme.onSurface)),
                       IconButton(
                         icon: const Icon(Icons.chevron_right_rounded, color: _blue),
                         onPressed: () => ss(() {
@@ -171,19 +168,19 @@ Future<String?> pickFullDate(
                         child: Container(
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
-                            color: isSelected ? _blue : disabled ? _border : _blueLight,
+                            color: isSelected ? _blue : disabled ? theme.outline : _blue.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(mNames[i],
                               style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
-                                  color: isSelected ? _white : disabled ? _textGrey.withOpacity(0.4) : _blue)),
+                                  color: isSelected ? _white : disabled ? theme.onSurfaceVariant.withOpacity(0.4) : _blue)),
                         ),
                       );
                     },
                   ),
                   const SizedBox(height: 12),
-                  const Align(alignment: Alignment.centerLeft,
-                      child: Text('Day', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _textDark))),
+                  Align(alignment: Alignment.centerLeft,
+                      child: Text('Day', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: theme.onSurface))),
                   const SizedBox(height: 8),
                   GridView.builder(
                     shrinkWrap: true,
@@ -203,12 +200,12 @@ Future<String?> pickFullDate(
                         child: Container(
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
-                            color: isSel ? _blue : disabled ? Colors.transparent : _blueLight,
+                            color: isSel ? _blue : disabled ? Colors.transparent : _blue.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text('$day',
                               style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
-                                  color: isSel ? _white : disabled ? _textGrey.withOpacity(0.3) : _blue)),
+                                  color: isSel ? _white : disabled ? theme.onSurfaceVariant.withOpacity(0.3) : _blue)),
                         ),
                       );
                     },
@@ -219,7 +216,7 @@ Future<String?> pickFullDate(
                     children: [
                       TextButton(
                           onPressed: () => Navigator.pop(ctx, null),
-                          child: const Text('Cancel', style: TextStyle(color: _textGrey))),
+                          child: Text('Cancel', style: TextStyle(color: theme.onSurfaceVariant))),
                       const SizedBox(width: 8),
                       ElevatedButton(
                         onPressed: () {
@@ -333,13 +330,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // ── Settings ─────────────────────────────────────────────────
 
   void _openSettings() {
+    final theme = Theme.of(context).colorScheme;
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: theme.surfaceContainerHighest,
       builder: (ctx) => _SettingsSheet(
         userId: widget.id,
         currentName:  _user?['name']  ?? '',
@@ -363,45 +361,51 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // ── Confirm dialogs ─────────────────────────────────────────
 
-  Future<bool> _confirmSave() async =>
-      await showDialog<bool>(
-        context: context, // screen-level context — always valid
-        builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text('Save Changes', style: TextStyle(fontWeight: FontWeight.w700)),
-          content: const Text('Are you sure you want to save?'),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('No', style: TextStyle(color: _textGrey))),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              style: ElevatedButton.styleFrom(backgroundColor: _blue, foregroundColor: _white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-              child: const Text('Yes'),
-            ),
-          ],
-        ),
-      ) ?? false;
+  Future<bool> _confirmSave() async {
+    final theme = Theme.of(context).colorScheme;
+    return await showDialog<bool>(
+      context: context, // screen-level context — always valid
+      builder: (ctx) => AlertDialog(
+        backgroundColor: theme.surfaceContainerHighest,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Save Changes', style: TextStyle(fontWeight: FontWeight.w700, color: theme.onSurface)),
+        content: Text('Are you sure you want to save?', style: TextStyle(color: theme.onSurfaceVariant)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false),
+              child: Text('No', style: TextStyle(color: theme.onSurfaceVariant))),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: _blue, foregroundColor: _white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+            child: const Text('Yes'),
+          ),
+        ],
+      ),
+    ) ?? false;
+  }
 
-  Future<bool> _confirmDelete(String name) async =>
-      await showDialog<bool>(
-        context: context, // screen-level context — always valid
-        builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text('Delete', style: TextStyle(fontWeight: FontWeight.w700)),
-          content: Text('Are you sure you want to delete "$name"?'),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Cancel', style: TextStyle(color: _textGrey))),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: _white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-              child: const Text('Delete'),
-            ),
-          ],
-        ),
-      ) ?? false;
+  Future<bool> _confirmDelete(String name) async {
+    final theme = Theme.of(context).colorScheme;
+    return await showDialog<bool>(
+      context: context, // screen-level context — always valid
+      builder: (ctx) => AlertDialog(
+        backgroundColor: theme.surfaceContainerHighest,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Delete', style: TextStyle(fontWeight: FontWeight.w700, color: theme.onSurface)),
+        content: Text('Are you sure you want to delete "$name"?', style: TextStyle(color: theme.onSurfaceVariant)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false),
+              child: Text('Cancel', style: TextStyle(color: theme.onSurfaceVariant))),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    ) ?? false;
+  }
 
   // ── About ────────────────────────────────────────────────────
 
@@ -409,40 +413,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final ctrl = TextEditingController(text: _info?['about'] ?? '');
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Edit About', style: TextStyle(fontWeight: FontWeight.w700)),
-        content: TextField(controller: ctrl, maxLines: 5, decoration: _inputDec('Tell us about yourself...')),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel', style: TextStyle(color: _textGrey))),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              if (!await _confirmSave()) return;
-              try {
-                if (_info == null) {
-                  await _db.from('Profile_info').insert({'user_id': widget.id, 'about': ctrl.text.trim(), 'skills': ''});
-                } else {
-                  await _db.from('Profile_info').update({'about': ctrl.text.trim()}).eq('user_id', widget.id);
+      builder: (ctx) {
+        final theme = Theme.of(ctx).colorScheme;
+        return AlertDialog(
+          backgroundColor: theme.surfaceContainerHighest,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text('Edit About', style: TextStyle(fontWeight: FontWeight.w700, color: theme.onSurface)),
+          content: TextField(
+              controller: ctrl, 
+              maxLines: 5, 
+              style: TextStyle(color: theme.onSurface),
+              decoration: _inputDec(ctx, 'Tell us about yourself...')),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx),
+                child: Text('Cancel', style: TextStyle(color: theme.onSurfaceVariant))),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                if (!await _confirmSave()) return;
+                try {
+                  if (_info == null) {
+                    await _db.from('Profile_info').insert({'user_id': widget.id, 'about': ctrl.text.trim(), 'skills': ''});
+                  } else {
+                    await _db.from('Profile_info').update({'about': ctrl.text.trim()}).eq('user_id', widget.id);
+                  }
+                  _fetchAll();
+                } catch (e) {
+                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
                 }
-                _fetchAll();
-              } catch (e) {
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: _blue, foregroundColor: _white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-            child: const Text('Save'),
-          ),
-        ],
-      ),
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: _blue, foregroundColor: _white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
     );
   }
 
   // ── Skills ───────────────────────────────────────────────────
 
   void _showSkillsMenu(BuildContext anchorCtx) async {
+    final theme = Theme.of(anchorCtx).colorScheme;
     final skills  = _parseSkills(_info?['skills']);
     final box     = anchorCtx.findRenderObject() as RenderBox;
     final overlay = Navigator.of(anchorCtx).overlay!.context.findRenderObject() as RenderBox;
@@ -455,13 +468,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final choice = await showMenu<String>(
       context: anchorCtx,
       position: pos,
+      color: theme.surfaceContainerHighest,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       items: [
         PopupMenuItem(value: 'add',
-            child: Row(children: const [
-              Icon(Icons.add_circle_outline_rounded, size: 18, color: _blue),
-              SizedBox(width: 10),
-              Text('Add Skill', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: _textDark)),
+            child: Row(children: [
+              const Icon(Icons.add_circle_outline_rounded, size: 18, color: _blue),
+              const SizedBox(width: 10),
+              Text('Add Skill', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: theme.onSurface)),
             ])),
         if (skills.isNotEmpty)
           PopupMenuItem(value: 'delete',
@@ -487,37 +501,46 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final ctrl = TextEditingController();
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Add Skill (${existing.length}/10)', style: const TextStyle(fontWeight: FontWeight.w700)),
-        content: TextField(controller: ctrl, decoration: _inputDec('e.g. Flutter, Python...'), autofocus: true),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel', style: TextStyle(color: _textGrey))),
-          ElevatedButton(
-            onPressed: () async {
-              final s = ctrl.text.trim();
-              if (s.isEmpty) return;
-              Navigator.pop(ctx);
-              if (!await _confirmSave()) return;
-              try {
-                final updated = [...existing, s].join(',');
-                if (_info == null) {
-                  await _db.from('Profile_info').insert({'user_id': widget.id, 'about': '', 'skills': updated});
-                } else {
-                  await _db.from('Profile_info').update({'skills': updated}).eq('user_id', widget.id);
-                }
-                _fetchAll();
-              } catch (e) {
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: _blue, foregroundColor: _white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-            child: const Text('Save'),
+      builder: (ctx) {
+        final theme = Theme.of(ctx).colorScheme;
+        return AlertDialog(
+          backgroundColor: theme.surfaceContainerHighest,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text('Add Skill (${existing.length}/10)', style: TextStyle(fontWeight: FontWeight.w700, color: theme.onSurface)),
+          content: TextField(
+            controller: ctrl, 
+            style: TextStyle(color: theme.onSurface),
+            decoration: _inputDec(ctx, 'e.g. Flutter, Python...'), 
+            autofocus: true
           ),
-        ],
-      ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx),
+                child: Text('Cancel', style: TextStyle(color: theme.onSurfaceVariant))),
+            ElevatedButton(
+              onPressed: () async {
+                final s = ctrl.text.trim();
+                if (s.isEmpty) return;
+                Navigator.pop(ctx);
+                if (!await _confirmSave()) return;
+                try {
+                  final updated = [...existing, s].join(',');
+                  if (_info == null) {
+                    await _db.from('Profile_info').insert({'user_id': widget.id, 'about': '', 'skills': updated});
+                  } else {
+                    await _db.from('Profile_info').update({'skills': updated}).eq('user_id', widget.id);
+                  }
+                  _fetchAll();
+                } catch (e) {
+                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: _blue, foregroundColor: _white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -548,105 +571,109 @@ class _ProfileScreenState extends State<ProfileScreen> {
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, ss) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text(existing == null ? 'Add Internship' : 'Edit Internship',
-              style: const TextStyle(fontWeight: FontWeight.w700)),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _dialogLabel('Department'), const SizedBox(height: 6),
-                TextField(controller: deptCtrl, decoration: _inputDec('e.g. Software Engineering')),
-                const SizedBox(height: 12),
-                _dialogLabel('Company'), const SizedBox(height: 6),
-                TextField(controller: compCtrl, decoration: _inputDec('e.g. Google')),
-                const SizedBox(height: 12),
-                _dialogLabel('Description'), const SizedBox(height: 6),
-                TextField(controller: descCtrl, maxLines: 3, decoration: _inputDec('What did you do there?')),
-                const SizedBox(height: 12),
-                _dialogLabel('Start Date'), const SizedBox(height: 6),
-                InkWell(
-                  borderRadius: BorderRadius.circular(10),
-                  onTap: () async {
-                    final picked = await pickFullDate(context, initial: startVal, maxDate: yesterday);
-                    if (picked != null) ss(() => startVal = picked);
-                  },
-                  child: _datePicker(startVal, 'Pick start date'),
-                ),
-                const SizedBox(height: 12),
-                _dialogLabel('End Date'), const SizedBox(height: 6),
-                InkWell(
-                  borderRadius: BorderRadius.circular(10),
-                  onTap: () async {
-                    DateTime? minEnd;
-                    if (startVal.isNotEmpty) {
-                      minEnd = _addMonths(DateTime.parse(startVal), 1);
-                    }
-                    final picked = await pickFullDate(context, initial: endVal,
-                        minDate: minEnd, maxDate: yesterday);
-                    if (picked != null) ss(() => endVal = picked);
-                  },
-                  child: _datePicker(endVal, 'Pick end date'),
-                ),
-                if (errorMsg != null) ...[
-                  const SizedBox(height: 8),
-                  Text(errorMsg!, style: const TextStyle(color: Color(0xFFEF4444), fontSize: 12)),
+        builder: (ctx, ss) {
+          final theme = Theme.of(ctx).colorScheme;
+          return AlertDialog(
+            backgroundColor: theme.surfaceContainerHighest,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Text(existing == null ? 'Add Internship' : 'Edit Internship',
+                style: TextStyle(fontWeight: FontWeight.w700, color: theme.onSurface)),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _dialogLabel(ctx, 'Department'), const SizedBox(height: 6),
+                  TextField(controller: deptCtrl, style: TextStyle(color: theme.onSurface), decoration: _inputDec(ctx, 'e.g. Software Engineering')),
+                  const SizedBox(height: 12),
+                  _dialogLabel(ctx, 'Company'), const SizedBox(height: 6),
+                  TextField(controller: compCtrl, style: TextStyle(color: theme.onSurface), decoration: _inputDec(ctx, 'e.g. Google')),
+                  const SizedBox(height: 12),
+                  _dialogLabel(ctx, 'Description'), const SizedBox(height: 6),
+                  TextField(controller: descCtrl, maxLines: 3, style: TextStyle(color: theme.onSurface), decoration: _inputDec(ctx, 'What did you do there?')),
+                  const SizedBox(height: 12),
+                  _dialogLabel(ctx, 'Start Date'), const SizedBox(height: 6),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(10),
+                    onTap: () async {
+                      final picked = await pickFullDate(context, initial: startVal, maxDate: yesterday);
+                      if (picked != null) ss(() => startVal = picked);
+                    },
+                    child: _datePicker(ctx, startVal, 'Pick start date'),
+                  ),
+                  const SizedBox(height: 12),
+                  _dialogLabel(ctx, 'End Date'), const SizedBox(height: 6),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(10),
+                    onTap: () async {
+                      DateTime? minEnd;
+                      if (startVal.isNotEmpty) {
+                        minEnd = _addMonths(DateTime.parse(startVal), 1);
+                      }
+                      final picked = await pickFullDate(context, initial: endVal,
+                          minDate: minEnd, maxDate: yesterday);
+                      if (picked != null) ss(() => endVal = picked);
+                    },
+                    child: _datePicker(ctx, endVal, 'Pick end date'),
+                  ),
+                  if (errorMsg != null) ...[
+                    const SizedBox(height: 8),
+                    Text(errorMsg!, style: const TextStyle(color: Color(0xFFEF4444), fontSize: 12)),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancel', style: TextStyle(color: _textGrey))),
-            ElevatedButton(
-              onPressed: () async {
-                if (deptCtrl.text.trim().isEmpty || compCtrl.text.trim().isEmpty) {
-                  ss(() => errorMsg = 'Please fill in department and company.'); return;
-                }
-                if (startVal.isEmpty || endVal.isEmpty) {
-                  ss(() => errorMsg = 'Please pick both dates.'); return;
-                }
-                final start  = DateTime.parse(startVal);
-                final end    = DateTime.parse(endVal);
-                final minEnd = _addMonths(start, 1);
-                if (start.isAfter(yesterday)) {
-                  ss(() => errorMsg = 'Start date must be at most yesterday.'); return;
-                }
-                if (end.isAfter(yesterday)) {
-                  ss(() => errorMsg = 'End date must be at most yesterday.'); return;
-                }
-                if (!end.isAfter(start)) {
-                  ss(() => errorMsg = 'End date must be after start date.'); return;
-                }
-                if (end.isBefore(minEnd)) {
-                  ss(() => errorMsg = 'Duration must be at least 1 month.'); return;
-                }
-                Navigator.pop(ctx);
-                if (!await _confirmSave()) return;
-                try {
-                  final payload = {
-                    'user_id': widget.id, 'department': deptCtrl.text.trim(),
-                    'company': compCtrl.text.trim(), 'description': descCtrl.text.trim(),
-                    'start_date': startVal, 'end_date': endVal,
-                  };
-                  if (existing == null) {
-                    await _db.from('Internships').insert(payload);
-                  } else {
-                    await _db.from('Internships').update(payload).eq('id', existing['id']);
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx),
+                  child: Text('Cancel', style: TextStyle(color: theme.onSurfaceVariant))),
+              ElevatedButton(
+                onPressed: () async {
+                  if (deptCtrl.text.trim().isEmpty || compCtrl.text.trim().isEmpty) {
+                    ss(() => errorMsg = 'Please fill in department and company.'); return;
                   }
-                  _fetchAll();
-                } catch (e) {
-                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-                }
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: _blue, foregroundColor: _white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-              child: const Text('Save'),
-            ),
-          ],
-        ),
+                  if (startVal.isEmpty || endVal.isEmpty) {
+                    ss(() => errorMsg = 'Please pick both dates.'); return;
+                  }
+                  final start  = DateTime.parse(startVal);
+                  final end    = DateTime.parse(endVal);
+                  final minEnd = _addMonths(start, 1);
+                  if (start.isAfter(yesterday)) {
+                    ss(() => errorMsg = 'Start date must be at most yesterday.'); return;
+                  }
+                  if (end.isAfter(yesterday)) {
+                    ss(() => errorMsg = 'End date must be at most yesterday.'); return;
+                  }
+                  if (!end.isAfter(start)) {
+                    ss(() => errorMsg = 'End date must be after start date.'); return;
+                  }
+                  if (end.isBefore(minEnd)) {
+                    ss(() => errorMsg = 'Duration must be at least 1 month.'); return;
+                  }
+                  Navigator.pop(ctx);
+                  if (!await _confirmSave()) return;
+                  try {
+                    final payload = {
+                      'user_id': widget.id, 'department': deptCtrl.text.trim(),
+                      'company': compCtrl.text.trim(), 'description': descCtrl.text.trim(),
+                      'start_date': startVal, 'end_date': endVal,
+                    };
+                    if (existing == null) {
+                      await _db.from('Internships').insert(payload);
+                    } else {
+                      await _db.from('Internships').update(payload).eq('id', existing['id']);
+                    }
+                    _fetchAll();
+                  } catch (e) {
+                    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                  }
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: _blue, foregroundColor: _white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                child: const Text('Save'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -682,36 +709,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
       barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, ss) {
+          final theme = Theme.of(ctx).colorScheme;
           bool isUploading = false;
 
           return AlertDialog(
+            backgroundColor: theme.surfaceContainerHighest,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             title: Text(
               existing == null ? 'Add Certificate' : 'Edit Certificate',
-              style: const TextStyle(fontWeight: FontWeight.w700),
+              style: TextStyle(fontWeight: FontWeight.w700, color: theme.onSurface),
             ),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _dialogLabel('Title'), const SizedBox(height: 6),
-                  TextField(controller: titleCtrl, decoration: _inputDec('e.g. Flutter Bootcamp')),
+                  _dialogLabel(ctx, 'Title'), const SizedBox(height: 6),
+                  TextField(controller: titleCtrl, style: TextStyle(color: theme.onSurface), decoration: _inputDec(ctx, 'e.g. Flutter Bootcamp')),
                   const SizedBox(height: 12),
-                  _dialogLabel('Description'), const SizedBox(height: 6),
-                  TextField(controller: descCtrl, maxLines: 3, decoration: _inputDec('Short description...')),
+                  _dialogLabel(ctx, 'Description'), const SizedBox(height: 6),
+                  TextField(controller: descCtrl, maxLines: 3, style: TextStyle(color: theme.onSurface), decoration: _inputDec(ctx, 'Short description...')),
                   const SizedBox(height: 12),
-                  _dialogLabel('Date'), const SizedBox(height: 6),
+                  _dialogLabel(ctx, 'Date'), const SizedBox(height: 6),
                   InkWell(
                     borderRadius: BorderRadius.circular(10),
                     onTap: () async {
                       final picked = await pickFullDate(context, initial: dateVal, maxDate: yesterday);
                       if (picked != null) ss(() => dateVal = picked);
                     },
-                    child: _datePicker(dateVal, 'Pick date'),
+                    child: _datePicker(ctx, dateVal, 'Pick date'),
                   ),
                   const SizedBox(height: 16),
-                  _dialogLabel('Certificate Image'), const SizedBox(height: 8),
+                  _dialogLabel(ctx, 'Certificate Image'), const SizedBox(height: 8),
                   InkWell(
                     borderRadius: BorderRadius.circular(12),
                     onTap: () async {
@@ -729,7 +758,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       height: 96,
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: _blueLight,
+                        color: _blue.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: _blue.withOpacity(0.3)),
                       ),
@@ -765,7 +794,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(height: 12),
                     const Center(child: CircularProgressIndicator(color: _blue)),
                     const SizedBox(height: 6),
-                    const Center(child: Text('Saving...', style: TextStyle(fontSize: 12, color: _textGrey))),
+                    Center(child: Text('Saving...', style: TextStyle(fontSize: 12, color: theme.onSurfaceVariant))),
                   ],
                 ],
               ),
@@ -773,7 +802,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             actions: [
               TextButton(
                 onPressed: isUploading ? null : () => Navigator.pop(ctx),
-                child: const Text('Cancel', style: TextStyle(color: _textGrey)),
+                child: Text('Cancel', style: TextStyle(color: theme.onSurfaceVariant)),
               ),
               ElevatedButton(
                 onPressed: isUploading
@@ -878,56 +907,61 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     showDialog(
       context: context,
-      builder: (ctx) => Dialog(
-        insetPadding: const EdgeInsets.all(20),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      (item['title'] ?? 'Certificate').toString(),
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+      builder: (ctx) {
+        final theme = Theme.of(ctx).colorScheme;
+        return Dialog(
+          backgroundColor: theme.surfaceContainerHighest,
+          insetPadding: const EdgeInsets.all(20),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        (item['title'] ?? 'Certificate').toString(),
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: theme.onSurface),
+                      ),
                     ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    icon: const Icon(Icons.close_rounded),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: imageBytes != null
-                    ? Image.memory(imageBytes, fit: BoxFit.contain)
-                    : Image.network(
-                        imageUrl,
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, _, __) => Container(
-                          height: 220,
-                          color: _blueLight,
-                          child: const Center(
-                            child: Icon(Icons.broken_image_outlined, color: _blue, size: 36),
+                    IconButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      icon: Icon(Icons.close_rounded, color: theme.onSurfaceVariant),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: imageBytes != null
+                      ? Image.memory(imageBytes, fit: BoxFit.contain)
+                      : Image.network(
+                          imageUrl,
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, _, __) => Container(
+                            height: 220,
+                            color: _blue.withOpacity(0.1),
+                            child: const Center(
+                              child: Icon(Icons.broken_image_outlined, color: _blue, size: 36),
+                            ),
                           ),
                         ),
-                      ),
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
-        ),
-      ),
+        );
+      }
     );
   }
 
   // ── CV Upload ───────────────────────────────────────────────
 
   Future<void> _uploadCv() async {
+    final theme = Theme.of(context).colorScheme;
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -945,11 +979,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (ctx) => const AlertDialog(
+        builder: (ctx) => AlertDialog(
+          backgroundColor: theme.surfaceContainerHighest,
           content: Row(children: [
-            CircularProgressIndicator(color: _blue),
-            SizedBox(width: 16),
-            Text('Uploading CV...'),
+            const CircularProgressIndicator(color: _blue),
+            const SizedBox(width: 16),
+            Text('Uploading CV...', style: TextStyle(color: theme.onSurface)),
           ]),
         ),
       );
@@ -1039,27 +1074,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // ── Shared helpers ───────────────────────────────────────────
 
-  Widget _datePicker(String value, String placeholder) => Container(
-    child: Row(children: [
-      const Icon(Icons.calendar_month_outlined, size: 16, color: _blue),
-      const SizedBox(width: 8),
-      Text(value.isEmpty ? placeholder : _formatFullDate(value),
-          style: TextStyle(fontSize: 13, color: value.isEmpty ? const Color(0xFFADB5BD) : _textDark)),
-    ]),
-  );
+  Widget _datePicker(BuildContext context, String value, String placeholder) {
+    final theme = Theme.of(context).colorScheme;
+    return Container(
+      child: Row(children: [
+        const Icon(Icons.calendar_month_outlined, size: 16, color: _blue),
+        const SizedBox(width: 8),
+        Text(value.isEmpty ? placeholder : _formatFullDate(value),
+            style: TextStyle(fontSize: 13, color: value.isEmpty ? theme.onSurfaceVariant.withOpacity(0.6) : theme.onSurface)),
+      ]),
+    );
+  }
 
-  InputDecoration _inputDec(String hint) => InputDecoration(
-    hintText: hint,
-    hintStyle: const TextStyle(color: Color(0xFFADB5BD), fontSize: 13),
-    filled: true, fillColor: const Color(0xFFF8FAFC),
-    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-    border:        OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _border)),
-    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _border)),
-    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _blue, width: 1.5)),
-  );
+  InputDecoration _inputDec(BuildContext context, String hint) {
+    final theme = Theme.of(context).colorScheme;
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: TextStyle(color: theme.onSurfaceVariant.withOpacity(0.6), fontSize: 13),
+      filled: true, fillColor: theme.surface,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      border:        OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: theme.outline)),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: theme.outline)),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _blue, width: 1.5)),
+    );
+  }
 
-  Widget _dialogLabel(String text) =>
-      Text(text, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _textDark));
+  Widget _dialogLabel(BuildContext context, String text) {
+    final theme = Theme.of(context).colorScheme;
+    return Text(text, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: theme.onSurface));
+  }
 
   List<String> _parseSkills(String? raw) {
     if (raw == null || raw.trim().isEmpty) return [];
@@ -1070,13 +1113,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
+    
     if (_isLoading) {
-      return const Scaffold(backgroundColor: _bluePale,
-          body: Center(child: CircularProgressIndicator(color: _blue)));
+      return Scaffold(backgroundColor: theme.surface,
+          body: const Center(child: CircularProgressIndicator(color: _blue)));
     }
     if (_user == null) {
-      return const Scaffold(backgroundColor: _bluePale,
-          body: Center(child: Text('No user found.')));
+      return Scaffold(backgroundColor: theme.surface,
+          body: const Center(child: Text('No user found.')));
     }
 
     final name        = _user!['name']         ?? '';
@@ -1108,7 +1153,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     return Scaffold(
-      backgroundColor: _bluePale,
+      backgroundColor: theme.surface,
       body: body,
       bottomNavigationBar: _BottomBar(
         currentIndex: _navIndex,
@@ -1124,6 +1169,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required double sw, required double sh, required double hPad,
     required double avatarSize, required double heroFont, required double subFont,
   }) {
+    final theme = Theme.of(context).colorScheme;
     return Stack(
       children: [
         Positioned(top: -sh * 0.07, left: -sw * 0.18,
@@ -1142,7 +1188,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     children: [
                       Text('My Profile',
                           style: TextStyle(fontSize: (sw * 0.055).clamp(18.0, 24.0),
-                              fontWeight: FontWeight.w800, color: _textDark, letterSpacing: -0.3)),
+                              fontWeight: FontWeight.w800, color: theme.onSurface, letterSpacing: -0.3)),
                       _RippleIconBtn(icon: Icons.settings_outlined, onTap: _openSettings),
                     ],
                   ),
@@ -1155,8 +1201,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: Container(
                     padding: EdgeInsets.all(sw * 0.04),
                     decoration: BoxDecoration(
-                      color: _white, borderRadius: BorderRadius.circular(20),
-                      boxShadow: [BoxShadow(color: _blue.withOpacity(0.10),
+                      color: theme.surfaceContainerHighest, borderRadius: BorderRadius.circular(20),
+                      boxShadow: [BoxShadow(color: theme.primary.withOpacity(0.05),
                           blurRadius: 30, spreadRadius: 1, offset: const Offset(0, 8))],
                     ),
                     child: Row(
@@ -1167,14 +1213,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             width: avatarSize, height: avatarSize,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              gradient: const LinearGradient(
-                                  colors: [Color(0xFF60A5FA), _blue],
+                              gradient: LinearGradient(
+                                  colors: [const Color(0xFF60A5FA), theme.primary],
                                   begin: Alignment.topLeft, end: Alignment.bottomRight),
-                              boxShadow: [BoxShadow(color: _blue.withOpacity(0.3),
+                              boxShadow: [BoxShadow(color: theme.primary.withOpacity(0.3),
                                   blurRadius: 16, offset: const Offset(0, 6))],
                             ),
                             child: Center(child: Text(initials,
-                                style: TextStyle(color: _white,
+                                style: TextStyle(color: Colors.white,
                                     fontSize: avatarSize * 0.32, fontWeight: FontWeight.w800))),
                           ),
                           Positioned(bottom: 2, right: 2,
@@ -1182,7 +1228,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 width: avatarSize * 0.2, height: avatarSize * 0.2,
                                 decoration: BoxDecoration(
                                     color: const Color(0xFF22C55E), shape: BoxShape.circle,
-                                    border: Border.all(color: _white, width: 2)),
+                                    border: Border.all(color: theme.surfaceContainerHighest, width: 2)),
                               )),
                         ]),
                         SizedBox(width: sw * 0.04),
@@ -1190,31 +1236,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                             Row(children: [
                               Expanded(child: Text(name,
-                                  style: TextStyle(fontSize: heroFont, fontWeight: FontWeight.w800, color: _textDark),
+                                  style: TextStyle(fontSize: heroFont, fontWeight: FontWeight.w800, color: theme.onSurface),
                                   overflow: TextOverflow.ellipsis)),
                               if (accountType.isNotEmpty)
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                                  decoration: BoxDecoration(color: _blueLight, borderRadius: BorderRadius.circular(20)),
+                                  decoration: BoxDecoration(color: _blue.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
                                   child: Row(mainAxisSize: MainAxisSize.min, children: [
                                     const Icon(Icons.verified_rounded, size: 11, color: _blue),
                                     const SizedBox(width: 3),
-                                    Text(accountType, style: TextStyle(fontSize: subFont, color: _blue, fontWeight: FontWeight.w700)),
+                                    Text(accountType, style: TextStyle(fontSize: subFont, color: const Color.fromARGB(255, 135, 165, 234), fontWeight: FontWeight.w700)),
                                   ]),
                                 ),
                             ]),
                             SizedBox(height: sw * 0.02),
                             Row(children: [
-                              const Icon(Icons.email_outlined, size: 13, color: _textGrey),
+                              Icon(Icons.email_outlined, size: 13, color: theme.onSurfaceVariant),
                               const SizedBox(width: 4),
                               Expanded(child: Text(email, overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(fontSize: subFont, color: _textGrey))),
+                                  style: TextStyle(fontSize: subFont, color: theme.onSurfaceVariant))),
                             ]),
                             SizedBox(height: sw * 0.015),
                             Row(children: [
-                              const Icon(Icons.phone_outlined, size: 13, color: _textGrey),
+                              Icon(Icons.phone_outlined, size: 13, color: theme.onSurfaceVariant),
                               const SizedBox(width: 4),
-                              Text(phone, style: TextStyle(fontSize: subFont, color: _textGrey)),
+                              Text(phone, style: TextStyle(fontSize: subFont, color: theme.onSurfaceVariant)),
                             ]),
                           ]),
                         ),
@@ -1244,7 +1290,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: _WhiteCard(child: Text(
                     about.isNotEmpty ? about : 'No about info yet. Tap Edit to add.',
                     style: TextStyle(fontSize: 13, height: 1.6,
-                        color: about.isNotEmpty ? _textGrey : _textGrey.withOpacity(0.6)),
+                        color: about.isNotEmpty ? theme.onSurfaceVariant : theme.onSurfaceVariant.withOpacity(0.6)),
                   )),
                 ),
               ),
@@ -1291,7 +1337,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               )).toList(),
                             )
                           : Text('No skills yet. Tap ··· to add some. (Max 10)',
-                              style: TextStyle(fontSize: 13, color: _textGrey.withOpacity(0.6))),
+                              style: TextStyle(fontSize: 13, color: theme.onSurfaceVariant.withOpacity(0.6))),
                     ]),
                   ),
                 ),
@@ -1305,7 +1351,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: _WhiteCard(
                     child: _internships.isEmpty
                         ? Text('No internships yet. Tap Add to add.',
-                            style: TextStyle(fontSize: 13, color: _textGrey.withOpacity(0.6)))
+                            style: TextStyle(fontSize: 13, color: theme.onSurfaceVariant.withOpacity(0.6)))
                         : Column(
                             children: _internships.map((i) => _InternshipItem(
                               data: i,
@@ -1324,10 +1370,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: _WhiteCard(
                     child: _cvUrl.isEmpty
                         ? Column(children: [
-                            const Icon(Icons.description_outlined, size: 40, color: _textGrey),
+                            Icon(Icons.description_outlined, size: 40, color: theme.onSurfaceVariant),
                             const SizedBox(height: 8),
                             Text('No CV uploaded yet',
-                                style: TextStyle(fontSize: 13, color: _textGrey.withOpacity(0.6))),
+                                style: TextStyle(fontSize: 13, color: theme.onSurfaceVariant.withOpacity(0.6))),
                             const SizedBox(height: 12),
                             ElevatedButton.icon(
                               onPressed: _uploadCv,
@@ -1344,7 +1390,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: _blueLight,
+                                color: _blue.withOpacity(0.1),
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(color: _blue.withOpacity(0.3)),
                               ),
@@ -1360,11 +1406,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                    const Text('CV / Resume',
-                                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _textDark)),
+                                    Text('CV / Resume',
+                                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: theme.onSurface)),
                                     const SizedBox(height: 2),
                                     Text('PDF, DOC, or DOCX',
-                                        style: TextStyle(fontSize: 12, color: _textGrey)),
+                                        style: TextStyle(fontSize: 12, color: theme.onSurfaceVariant)),
                                   ]),
                                 ),
                                 IconButton(
@@ -1420,7 +1466,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         Padding(
                           padding: const EdgeInsets.only(bottom: 12),
                           child: Text('No certificates yet.',
-                              style: TextStyle(fontSize: 13, color: _textGrey.withOpacity(0.6))),
+                              style: TextStyle(fontSize: 13, color: theme.onSurfaceVariant.withOpacity(0.6))),
                         ),
                       ..._certs.map((c) => _CertCard(
                             data: c,
@@ -1438,7 +1484,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             width: double.infinity,
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             decoration: BoxDecoration(
-                              color: _blueLight, borderRadius: BorderRadius.circular(12),
+                              color: _blue.withOpacity(0.1), 
+                              borderRadius: BorderRadius.circular(12),
                               border: Border.all(color: _blue.withOpacity(0.3)),
                             ),
                             child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
@@ -1475,7 +1522,7 @@ class _SkillChip extends StatelessWidget {
       duration: const Duration(milliseconds: 200),
       padding: EdgeInsets.only(left: 12, right: deleteMode ? 6 : 12, top: 5, bottom: 5),
       decoration: BoxDecoration(
-        color: _blueLight, borderRadius: BorderRadius.circular(20),
+        color: _blue.withOpacity(0.1), borderRadius: BorderRadius.circular(20),
         border: Border.all(color: deleteMode ? Colors.red.withOpacity(0.45) : _blue.withOpacity(0.25)),
       ),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
@@ -1507,24 +1554,25 @@ class _InternshipItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
     final dateStr = '${_formatFullDate(data['start_date'])} – ${_formatFullDate(data['end_date'])}';
     final desc    = (data['description'] ?? '').toString().trim();
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Container(width: 42, height: 42,
-            decoration: BoxDecoration(color: _blueLight, borderRadius: BorderRadius.circular(10)),
+            decoration: BoxDecoration(color: _blue.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
             child: const Icon(Icons.work_outline_rounded, color: _blue, size: 20)),
         const SizedBox(width: 12),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(data['company'] ?? '',
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _textDark)),
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: theme.onSurface)),
           const SizedBox(height: 2),
-          Text(data['department'] ?? '', style: const TextStyle(fontSize: 13, color: _textGrey)),
+          Text(data['department'] ?? '', style: TextStyle(fontSize: 13, color: theme.onSurfaceVariant)),
           const SizedBox(height: 5),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(color: _blueLight, borderRadius: BorderRadius.circular(20),
+            decoration: BoxDecoration(color: _blue.withOpacity(0.1), borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: _blue.withOpacity(0.2))),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               const Icon(Icons.calendar_today_rounded, size: 10, color: _blue),
@@ -1534,7 +1582,7 @@ class _InternshipItem extends StatelessWidget {
           ),
           if (desc.isNotEmpty) ...[
             const SizedBox(height: 6),
-            Text(desc, style: const TextStyle(fontSize: 12, color: _textGrey, height: 1.45)),
+            Text(desc, style: TextStyle(fontSize: 12, color: theme.onSurfaceVariant, height: 1.45)),
           ],
         ])),
         Column(mainAxisSize: MainAxisSize.min, children: [
@@ -1562,6 +1610,7 @@ class _CertCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
     final imageUrl   = (data['image_url'] as String?) ?? '';
     final imageBytes = _decodeCertificateImageValue(imageUrl);
     return Padding(
@@ -1575,43 +1624,43 @@ class _CertCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
               child: imageBytes != null
                   ? Image.memory(imageBytes, width: 92, height: 92, fit: BoxFit.cover,
-                      errorBuilder: (ctx, _, __) => Container(width: 92, height: 92, color: _blueLight,
+                      errorBuilder: (ctx, _, __) => Container(width: 92, height: 92, color: _blue.withOpacity(0.1),
                           child: const Center(child: Icon(Icons.broken_image_outlined, color: _blue))))
                   : Image.network(imageUrl, width: 92, height: 92, fit: BoxFit.cover,
                       loadingBuilder: (ctx, child, prog) => prog == null ? child :
-                          Container(width: 92, height: 92, color: _blueLight,
+                          Container(width: 92, height: 92, color: _blue.withOpacity(0.1),
                               child: const Center(child: SizedBox(width: 22, height: 22,
                                   child: CircularProgressIndicator(color: _blue, strokeWidth: 2.4)))),
-                      errorBuilder: (ctx, _, __) => Container(width: 92, height: 92, color: _blueLight,
+                      errorBuilder: (ctx, _, __) => Container(width: 92, height: 92, color: _blue.withOpacity(0.1),
                           child: const Center(child: Icon(Icons.broken_image_outlined, color: _blue)))),
             ),
           )
         else
           Container(width: 92, height: 92,
-              decoration: BoxDecoration(color: _blueLight, borderRadius: BorderRadius.circular(12)),
+              decoration: BoxDecoration(color: _blue.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
               child: const Icon(Icons.image_outlined, color: _blue)),
         const SizedBox(width: 12),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
               Expanded(child: Text(data['title'] ?? '',
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _textDark))),
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: theme.onSurface))),
               if ((data['date'] ?? '').isNotEmpty)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(color: _blueLight, borderRadius: BorderRadius.circular(20)),
+                  decoration: BoxDecoration(color: _blue.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
                   child: Text(_formatFullDate(data['date']),
                       style: const TextStyle(fontSize: 11, color: _blue, fontWeight: FontWeight.w600)),
                 ),
             ]),
             if ((data['description'] ?? '').isNotEmpty) ...[
               const SizedBox(height: 6),
-              Text(data['description'], style: const TextStyle(fontSize: 12, color: _textGrey, height: 1.4)),
+              Text(data['description'], style: TextStyle(fontSize: 12, color: theme.onSurfaceVariant, height: 1.4)),
             ],
             if (imageUrl.isNotEmpty) ...[
               const SizedBox(height: 6),
-              const Text('Tap image to view full certificate',
-                  style: TextStyle(fontSize: 11, color: _textGrey)),
+              Text('Tap image to view full certificate',
+                  style: TextStyle(fontSize: 11, color: theme.onSurfaceVariant)),
             ],
           ]),
         ),
@@ -1693,19 +1742,23 @@ class _SettingsSheetState extends State<_SettingsSheet> {
     }
   }
 
-  InputDecoration _dec(String hint, IconData icon) => InputDecoration(
-    hintText: hint,
-    hintStyle: const TextStyle(color: Color(0xFFADB5BD), fontSize: 13),
-    filled: true, fillColor: const Color(0xFFF8FAFC),
-    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-    prefixIcon: Icon(icon, color: const Color(0xFF94A3B8), size: 18),
-    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _border)),
-    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _border)),
-    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _blue, width: 1.8)),
-  );
+  InputDecoration _dec(BuildContext context, String hint, IconData icon) {
+    final theme = Theme.of(context).colorScheme;
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: TextStyle(color: theme.onSurfaceVariant.withOpacity(0.6), fontSize: 13),
+      filled: true, fillColor: theme.surface,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      prefixIcon: Icon(icon, color: theme.onSurfaceVariant, size: 18),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: theme.outline)),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: theme.outline)),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _blue, width: 1.8)),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
     return Padding(
       padding: EdgeInsets.only(
         left: 20, right: 20, top: 20,
@@ -1719,29 +1772,29 @@ class _SettingsSheetState extends State<_SettingsSheet> {
             child: Container(
               width: 40, height: 4,
               margin: const EdgeInsets.only(bottom: 20),
-              decoration: BoxDecoration(color: _border, borderRadius: BorderRadius.circular(2)),
+              decoration: BoxDecoration(color: theme.outline, borderRadius: BorderRadius.circular(2)),
             ),
           ),
-          const Text('Settings',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: _textDark)),
+          Text('Settings',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: theme.onSurface)),
           const SizedBox(height: 20),
-          const Text('Full Name',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _textDark)),
+          Text('Full Name',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: theme.onSurface)),
           const SizedBox(height: 6),
           TextField(
             controller: _nameCtrl,
-            style: const TextStyle(fontSize: 14, color: _textDark),
-            decoration: _dec('Your full name', Icons.person_outline_rounded),
+            style: TextStyle(fontSize: 14, color: theme.onSurface),
+            decoration: _dec(context, 'Your full name', Icons.person_outline_rounded),
           ),
           const SizedBox(height: 14),
-          const Text('Phone Number',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _textDark)),
+          Text('Phone Number',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: theme.onSurface)),
           const SizedBox(height: 6),
           TextField(
             controller: _phoneCtrl,
             keyboardType: TextInputType.phone,
-            style: const TextStyle(fontSize: 14, color: _textDark),
-            decoration: _dec('+20 123 456 7890', Icons.phone_outlined),
+            style: TextStyle(fontSize: 14, color: theme.onSurface),
+            decoration: _dec(context, '+20 123 456 7890', Icons.phone_outlined),
           ),
           const SizedBox(height: 20),
           SizedBox(
@@ -1752,7 +1805,7 @@ class _SettingsSheetState extends State<_SettingsSheet> {
                   elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
               child: _isSaving
                   ? const SizedBox(width: 20, height: 20,
-                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      child: CircularProgressIndicator(color: _white, strokeWidth: 2))
                   : const Text('Save Changes', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
             ),
           ),
@@ -1764,15 +1817,16 @@ class _SettingsSheetState extends State<_SettingsSheet> {
                 showDialog(
                   context: context,
                   builder: (ctx) => AlertDialog(
+                    backgroundColor: theme.surfaceContainerHighest,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    title: const Text('Log Out', style: TextStyle(fontWeight: FontWeight.w700)),
-                    content: const Text('Are you sure you want to log out?'),
+                    title: Text('Log Out', style: TextStyle(fontWeight: FontWeight.w700, color: theme.onSurface)),
+                    content: Text('Are you sure you want to log out?', style: TextStyle(color: theme.onSurfaceVariant)),
                     actions: [
                       TextButton(onPressed: () => Navigator.pop(ctx),
-                          child: const Text('Cancel', style: TextStyle(color: _textGrey))),
+                          child: Text('Cancel', style: TextStyle(color: theme.onSurfaceVariant))),
                       ElevatedButton(
                         onPressed: () { Navigator.pop(ctx); widget.onLogout(); },
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: _white,
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
                         child: const Text('Log Out'),
                       ),
@@ -1802,21 +1856,24 @@ class _StatCard extends StatelessWidget {
   const _StatCard({required this.value, required this.label});
 
   @override
-  Widget build(BuildContext context) => Expanded(
-    child: Container(
-      padding: const EdgeInsets.symmetric(vertical: 14),
-      decoration: BoxDecoration(
-        color: _white, borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: _blue.withOpacity(0.08), blurRadius: 20, offset: const Offset(0, 6))],
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: theme.surfaceContainerHighest, borderRadius: BorderRadius.circular(16),
+          boxShadow: [BoxShadow(color: _blue.withOpacity(0.08), blurRadius: 20, offset: const Offset(0, 6))],
+        ),
+        child: Column(children: [
+          Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: _blue)),
+          const SizedBox(height: 4),
+          Text(label, textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 11, color: theme.onSurfaceVariant, height: 1.3)),
+        ]),
       ),
-      child: Column(children: [
-        Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: _blue)),
-        const SizedBox(height: 4),
-        Text(label, textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 11, color: _textGrey, height: 1.3)),
-      ]),
-    ),
-  );
+    );
+  }
 }
 
 // ─── SECTION TITLE ───────────────────────
@@ -1836,6 +1893,7 @@ class _SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme  = Theme.of(context).colorScheme;
     final sw     = MediaQuery.of(context).size.width;
     final is3dot = buttonLabel == '···';
     return Padding(
@@ -1843,7 +1901,7 @@ class _SectionTitle extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _textDark)),
+          Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: theme.onSurface)),
           Builder(builder: (ctx) {
             return Material(
               color: _blue, borderRadius: BorderRadius.circular(20),
@@ -1876,15 +1934,18 @@ class _WhiteCard extends StatelessWidget {
   const _WhiteCard({required this.child});
 
   @override
-  Widget build(BuildContext context) => Container(
-    width: double.infinity,
-    padding: const EdgeInsets.all(18),
-    decoration: BoxDecoration(
-      color: _white, borderRadius: BorderRadius.circular(16),
-      boxShadow: [BoxShadow(color: _blue.withOpacity(0.07), blurRadius: 20, offset: const Offset(0, 6))],
-    ),
-    child: child,
-  );
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: theme.surfaceContainerHighest, borderRadius: BorderRadius.circular(16),
+        boxShadow: [BoxShadow(color: _blue.withOpacity(0.05), blurRadius: 20, offset: const Offset(0, 6))],
+      ),
+      child: child,
+    );
+  }
 }
 
 // ─── RIPPLE ICON BUTTON ──────────────────
@@ -1894,14 +1955,17 @@ class _RippleIconBtn extends StatelessWidget {
   const _RippleIconBtn({required this.icon, required this.onTap});
 
   @override
-  Widget build(BuildContext context) => Material(
-    color: _white, borderRadius: BorderRadius.circular(12),
-    elevation: 2, shadowColor: _blue.withOpacity(0.08),
-    child: InkWell(
-      borderRadius: BorderRadius.circular(12), onTap: onTap,
-      child: SizedBox(width: 38, height: 38, child: Icon(icon, color: _textDark, size: 20)),
-    ),
-  );
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
+    return Material(
+      color: theme.surfaceContainerHighest, borderRadius: BorderRadius.circular(12),
+      elevation: 2, shadowColor: _blue.withOpacity(0.05),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12), onTap: onTap,
+        child: SizedBox(width: 38, height: 38, child: Icon(icon, color: theme.onSurface, size: 20)),
+      ),
+    );
+  }
 }
 
 // ─── RIPPLE ACTION BUTTON ────────────────
@@ -1929,9 +1993,10 @@ class _BottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
     return Container(
       decoration: BoxDecoration(
-        color: _white,
+        color: theme.surfaceContainerHighest,
         boxShadow: [BoxShadow(color: _blue.withOpacity(0.08), blurRadius: 20, offset: const Offset(0, -4))],
       ),
       child: SafeArea(
@@ -1974,22 +2039,25 @@ class _NavItem extends StatelessWidget {
   const _NavItem({required this.icon, required this.label, required this.active, this.onTap});
 
   @override
-  Widget build(BuildContext context) => InkWell(
-    borderRadius: BorderRadius.circular(12),
-    onTap: onTap ?? () {},
-    child: Column(mainAxisSize: MainAxisSize.min, children: [
-      Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        decoration: BoxDecoration(
-          color: active ? _blueLight : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: onTap ?? () {},
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          decoration: BoxDecoration(
+            color: active ? _blue.withOpacity(0.1) : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: active ? _blue : theme.onSurfaceVariant, size: 22),
         ),
-        child: Icon(icon, color: active ? _blue : _textGrey, size: 22),
-      ),
-      const SizedBox(height: 2),
-      Text(label, style: TextStyle(fontSize: 10,
-          color: active ? _blue : _textGrey,
-          fontWeight: active ? FontWeight.w700 : FontWeight.w400)),
-    ]),
-  );
+        const SizedBox(height: 2),
+        Text(label, style: TextStyle(fontSize: 10,
+            color: active ? _blue : theme.onSurfaceVariant,
+            fontWeight: active ? FontWeight.w700 : FontWeight.w400)),
+      ]),
+    );
+  }
 }

@@ -2,11 +2,6 @@ import 'package:flutter/material.dart';
 import 'mock_interview_recorder.dart';
 
 const _blue = Color(0xFF3B82F6);
-const _blueLight = Color(0xFFEFF6FF);
-const _bluePale = Color(0xFFF0F7FF);
-const _textDark = Color(0xFF1E293B);
-const _textGrey = Color(0xFF64748B);
-const _white = Colors.white;
 
 class MockInterviewScreen extends StatefulWidget {
   const MockInterviewScreen({super.key});
@@ -57,8 +52,10 @@ class _MockInterviewScreenState extends State<MockInterviewScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
+
     return Scaffold(
-      backgroundColor: _bluePale,
+      backgroundColor: theme.surface,
       body: Stack(
         children: [
           Positioned(
@@ -91,7 +88,7 @@ class _MockInterviewScreenState extends State<MockInterviewScreen> {
                           width: 40,
                           height: 40,
                           decoration: BoxDecoration(
-                            color: _white,
+                            color: theme.surfaceContainerHighest,
                             borderRadius: BorderRadius.circular(12),
                             boxShadow: [
                               BoxShadow(
@@ -101,15 +98,15 @@ class _MockInterviewScreenState extends State<MockInterviewScreen> {
                               )
                             ],
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.arrow_back_ios_new_rounded,
-                            color: _textDark,
+                            color: theme.onSurface,
                             size: 16,
                           ),
                         ),
                       ),
                       const SizedBox(width: 14),
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -118,13 +115,13 @@ class _MockInterviewScreenState extends State<MockInterviewScreen> {
                               style: TextStyle(
                                 fontSize: 22,
                                 fontWeight: FontWeight.w800,
-                                color: _textDark,
+                                color: theme.onSurface,
                                 letterSpacing: -0.3,
                               ),
                             ),
                             Text(
                               'Practice full interview simulations',
-                              style: TextStyle(fontSize: 12, color: _textGrey),
+                              style: TextStyle(fontSize: 12, color: theme.onSurfaceVariant),
                             ),
                           ],
                         ),
@@ -175,6 +172,8 @@ class _InterviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
+    
     final difficulty = interview['difficulty'] as String;
     final diffColor = difficulty == 'Easy'
         ? const Color(0xFF10B981)
@@ -188,7 +187,7 @@ class _InterviewCard extends StatelessWidget {
         onTap: onTap,
         child: Container(
           decoration: BoxDecoration(
-            color: _white,
+            color: theme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
@@ -241,10 +240,10 @@ class _InterviewCard extends StatelessWidget {
                           children: [
                             Text(
                               interview['title'] as String,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w700,
-                                color: _textDark,
+                                color: theme.onSurface,
                               ),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
@@ -264,9 +263,9 @@ class _InterviewCard extends StatelessWidget {
                   children: [
                     Text(
                       interview['description'] as String,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
-                        color: _textGrey,
+                        color: theme.onSurfaceVariant,
                         height: 1.5,
                       ),
                     ),
@@ -329,7 +328,7 @@ class _InfoChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: _blueLight,
+        color: _blue.withOpacity(0.1),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: _blue.withOpacity(0.2)),
       ),

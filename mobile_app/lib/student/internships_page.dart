@@ -10,11 +10,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 // ─── COLORS (match User_profile.dart palette) ────────────────────────────────
 const _blue      = Color(0xFF3B82F6);
-const _blueLight = Color(0xFFEFF6FF);
-const _bluePale  = Color(0xFFF0F7FF);
-const _textDark  = Color(0xFF1E293B);
-const _textGrey  = Color(0xFF64748B);
-const _border    = Color(0xFFE2E8F0);
 const _white     = Colors.white;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -148,6 +143,7 @@ class _InternshipsPageState extends State<InternshipsPage> {
   // ─── DETAIL SHEET ────────────────────────────────────────────────────────
 
   void _showDetail(Map<String, dynamic> job) {
+    final theme      = Theme.of(context).colorScheme;
     final jobId      = job['id'] as int;
     final isApplied  = _appliedIds.contains(jobId);
     final company    = job['Company_profile']?['name'] ?? '—';
@@ -168,9 +164,9 @@ class _InternshipsPageState extends State<InternshipsPage> {
         maxChildSize: 0.95,
         minChildSize: 0.45,
         builder: (_, scrollCtrl) => Container(
-          decoration: const BoxDecoration(
-            color: _white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          decoration: BoxDecoration(
+            color: theme.surfaceContainerHighest,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: Column(
             children: [
@@ -180,7 +176,7 @@ class _InternshipsPageState extends State<InternshipsPage> {
                 child: Container(
                   width: 40, height: 4,
                   decoration: BoxDecoration(
-                    color: _border,
+                    color: theme.outline,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -224,14 +220,14 @@ class _InternshipsPageState extends State<InternshipsPage> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(company,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                         fontSize: 17,
                                         fontWeight: FontWeight.w800,
-                                        color: _textDark)),
+                                        color: theme.onSurface)),
                                 if (industry.isNotEmpty)
                                   Text(industry,
-                                      style: const TextStyle(
-                                          fontSize: 13, color: _textGrey)),
+                                      style: TextStyle(
+                                          fontSize: 13, color: theme.onSurfaceVariant)),
                               ],
                             ),
                           ),
@@ -242,10 +238,10 @@ class _InternshipsPageState extends State<InternshipsPage> {
 
                       // ── Title ──
                       Text(title,
-                          style: const TextStyle(
+                          style: TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.w900,
-                              color: _textDark,
+                              color: theme.onSurface,
                               letterSpacing: -0.4)),
 
                       const SizedBox(height: 12),
@@ -339,8 +335,10 @@ class _InternshipsPageState extends State<InternshipsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
+    
     return Scaffold(
-      backgroundColor: _bluePale,
+      backgroundColor: theme.surface,
       body: Stack(
         children: [
           // Background blobs
@@ -372,7 +370,7 @@ class _InternshipsPageState extends State<InternshipsPage> {
                         child: Container(
                           width: 40, height: 40,
                           decoration: BoxDecoration(
-                            color: _white,
+                            color: theme.surfaceContainerHighest,
                             borderRadius: BorderRadius.circular(12),
                             boxShadow: [
                               BoxShadow(
@@ -381,12 +379,12 @@ class _InternshipsPageState extends State<InternshipsPage> {
                                   offset: const Offset(0, 3))
                             ],
                           ),
-                          child: const Icon(Icons.arrow_back_ios_new_rounded,
-                              color: _textDark, size: 16),
+                          child: Icon(Icons.arrow_back_ios_new_rounded,
+                              color: theme.onSurface, size: 16),
                         ),
                       ),
                       const SizedBox(width: 14),
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -394,11 +392,11 @@ class _InternshipsPageState extends State<InternshipsPage> {
                                 style: TextStyle(
                                     fontSize: 22,
                                     fontWeight: FontWeight.w800,
-                                    color: _textDark,
+                                    color: theme.onSurface,
                                     letterSpacing: -0.3)),
                             Text('Browse & apply to opportunities',
                                 style: TextStyle(
-                                    fontSize: 12, color: _textGrey)),
+                                    fontSize: 12, color: theme.onSurfaceVariant)),
                           ],
                         ),
                       ),
@@ -408,7 +406,7 @@ class _InternshipsPageState extends State<InternshipsPage> {
                         child: Container(
                           width: 40, height: 40,
                           decoration: BoxDecoration(
-                            color: _white,
+                            color: theme.surfaceContainerHighest,
                             borderRadius: BorderRadius.circular(12),
                             boxShadow: [
                               BoxShadow(
@@ -417,8 +415,8 @@ class _InternshipsPageState extends State<InternshipsPage> {
                                   offset: const Offset(0, 3))
                             ],
                           ),
-                          child: const Icon(Icons.refresh_rounded,
-                              color: _textGrey, size: 20),
+                          child: Icon(Icons.refresh_rounded,
+                              color: theme.onSurfaceVariant, size: 20),
                         ),
                       ),
                     ],
@@ -430,7 +428,7 @@ class _InternshipsPageState extends State<InternshipsPage> {
                   padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: _white,
+                      color: theme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(14),
                       boxShadow: [
                         BoxShadow(
@@ -441,24 +439,24 @@ class _InternshipsPageState extends State<InternshipsPage> {
                     ),
                     child: TextField(
                       controller: _searchCtrl,
-                      style: const TextStyle(fontSize: 14, color: _textDark),
+                      style: TextStyle(fontSize: 14, color: theme.onSurface),
                       decoration: InputDecoration(
                         hintText: 'Search by title, company, location...',
-                        hintStyle: const TextStyle(
-                            color: Color(0xFFADB5BD), fontSize: 13),
-                        prefixIcon: const Icon(Icons.search_rounded,
-                            color: Color(0xFF94A3B8), size: 20),
+                        hintStyle: TextStyle(
+                            color: theme.onSurfaceVariant.withOpacity(0.6), fontSize: 13),
+                        prefixIcon: Icon(Icons.search_rounded,
+                            color: theme.onSurfaceVariant.withOpacity(0.8), size: 20),
                         suffixIcon: _searchCtrl.text.isNotEmpty
                             ? IconButton(
-                                icon: const Icon(Icons.close_rounded,
-                                    size: 18, color: Color(0xFF94A3B8)),
+                                icon: Icon(Icons.close_rounded,
+                                    size: 18, color: theme.onSurfaceVariant.withOpacity(0.8)),
                                 onPressed: () {
                                   _searchCtrl.clear();
                                 },
                               )
                             : null,
                         filled: true,
-                        fillColor: _white,
+                        fillColor: theme.surfaceContainerHighest,
                         contentPadding: const EdgeInsets.symmetric(
                             horizontal: 16, vertical: 14),
                         border: OutlineInputBorder(
@@ -483,10 +481,10 @@ class _InternshipsPageState extends State<InternshipsPage> {
                     _isLoading
                         ? 'Loading...'
                         : '${_filtered.length} opportunit${_filtered.length == 1 ? 'y' : 'ies'} found',
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: _textGrey),
+                        color: theme.onSurfaceVariant),
                   ),
                 ),
 
@@ -537,6 +535,7 @@ class _JobCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme    = Theme.of(context).colorScheme;
     final company  = job['Company_profile']?['name'] ?? '—';
     final title    = job['title'] ?? '';
     final loc      = job['location'] ?? '';
@@ -549,7 +548,7 @@ class _JobCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: _white,
+          color: theme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(18),
           boxShadow: [
             BoxShadow(
@@ -587,15 +586,15 @@ class _JobCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(title,
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
-                          color: _textDark),
+                          color: theme.onSurface),
                       overflow: TextOverflow.ellipsis),
                   const SizedBox(height: 3),
                   Text(company,
-                      style: const TextStyle(
-                          fontSize: 13, color: _textGrey),
+                      style: TextStyle(
+                          fontSize: 13, color: theme.onSurfaceVariant),
                       overflow: TextOverflow.ellipsis),
                   const SizedBox(height: 7),
                   Row(
@@ -629,8 +628,8 @@ class _JobCard extends StatelessWidget {
                         color: Color(0xFF10B981))),
               )
             else
-              const Icon(Icons.chevron_right_rounded,
-                  color: _textGrey, size: 20),
+              Icon(Icons.chevron_right_rounded,
+                  color: theme.onSurfaceVariant, size: 20),
           ],
         ),
       ),
@@ -647,16 +646,19 @@ class _MiniTag extends StatelessWidget {
   const _MiniTag(this.icon, this.label);
 
   @override
-  Widget build(BuildContext context) => Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 11, color: _textGrey),
-          const SizedBox(width: 3),
-          Text(label,
-              style: const TextStyle(fontSize: 11, color: _textGrey),
-              overflow: TextOverflow.ellipsis),
-        ],
-      );
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 11, color: theme.onSurfaceVariant),
+        const SizedBox(width: 3),
+        Text(label,
+            style: TextStyle(fontSize: 11, color: theme.onSurfaceVariant),
+            overflow: TextOverflow.ellipsis),
+      ],
+    );
+  }
 }
 
 class _Tag extends StatelessWidget {
@@ -668,7 +670,7 @@ class _Tag extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
-          color: _blueLight,
+          color: _blue.withOpacity(0.10),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: _blue.withOpacity(0.2)),
         ),
@@ -697,43 +699,46 @@ class _DetailSection extends StatelessWidget {
       required this.content});
 
   @override
-  Widget build(BuildContext context) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 30, height: 30,
-                decoration: BoxDecoration(
-                    color: _blueLight,
-                    borderRadius: BorderRadius.circular(9)),
-                child: Icon(icon, size: 15, color: _blue),
-              ),
-              const SizedBox(width: 10),
-              Text(title,
-                  style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: _textDark)),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: _bluePale,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: _border),
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 30, height: 30,
+              decoration: BoxDecoration(
+                  color: _blue.withOpacity(0.10),
+                  borderRadius: BorderRadius.circular(9)),
+              child: Icon(icon, size: 15, color: _blue),
             ),
-            child: Text(
-              content.isNotEmpty ? content : '—',
-              style: const TextStyle(
-                  fontSize: 13.5, color: _textGrey, height: 1.6),
-            ),
+            const SizedBox(width: 10),
+            Text(title,
+                style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: theme.onSurface)),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: _blue.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: theme.outline),
           ),
-        ],
-      );
+          child: Text(
+            content.isNotEmpty ? content : '—',
+            style: TextStyle(
+                fontSize: 13.5, color: theme.onSurfaceVariant, height: 1.6),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class _EmptyState extends StatelessWidget {
@@ -741,33 +746,36 @@ class _EmptyState extends StatelessWidget {
   const _EmptyState({required this.query});
 
   @override
-  Widget build(BuildContext context) => Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 72, height: 72,
-              decoration: BoxDecoration(
-                  color: _blueLight,
-                  borderRadius: BorderRadius.circular(22)),
-              child: const Icon(Icons.work_off_outlined,
-                  color: _blue, size: 34),
-            ),
-            const SizedBox(height: 18),
-            Text(
-              query.isEmpty
-                  ? 'No internships posted yet.'
-                  : 'No results for "$query".',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                  fontSize: 15,
-                  color: _textGrey,
-                  height: 1.6,
-                  fontWeight: FontWeight.w500),
-            ),
-          ],
-        ),
-      );
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 72, height: 72,
+            decoration: BoxDecoration(
+                color: _blue.withOpacity(0.10),
+                borderRadius: BorderRadius.circular(22)),
+            child: const Icon(Icons.work_off_outlined,
+                color: _blue, size: 34),
+          ),
+          const SizedBox(height: 18),
+          Text(
+            query.isEmpty
+                ? 'No internships posted yet.'
+                : 'No results for "$query".',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+                fontSize: 15,
+                color: theme.onSurfaceVariant,
+                height: 1.6,
+                fontWeight: FontWeight.w500),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _Blob extends StatelessWidget {

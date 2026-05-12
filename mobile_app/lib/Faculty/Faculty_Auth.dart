@@ -4,12 +4,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'Faculty_Session.dart';
 import 'Faculty_Home.dart';
 
-// ─── COLORS ──────────────────────────────────────────────────────────────────
-const _teal     = Color(0xFFFF6B6B);  // primary accent – matches UserRole teal
-const _textDark = Color(0xFF1E293B);
-const _textGrey = Color(0xFF64748B);
-const _border   = Color(0xFFCBD5E1);
-const _fieldBg  = Color(0xFFF8FAFC);
+// ─── COLORS (Brand Accents) ──────────────────────────────────────────────────
+const _teal = Color(0xFFFF6B6B);  // primary accent – matches UserRole teal
+const _facultyIndigo = Color(0xFF303F9F); // Academic-style primary color
 
 // ─── SUPABASE CLIENT ─────────────────────────────────────────────────────────
 final _db = Supabase.instance.client;
@@ -29,10 +26,6 @@ class _FacultyAuthScreenState extends State<FacultyAuthScreen>
   late AnimationController _ctrl;
   late Animation<double> _anim;
   bool _showRegister = false;
-
-  // Academic-style color palette (Indigo/Blue)
-  final Color _bgAccent = const Color(0xFFF5F7FA);
-  final Color _primaryBlue = const Color(0xFF303F9F);
 
   @override
   void initState() {
@@ -56,23 +49,24 @@ class _FacultyAuthScreenState extends State<FacultyAuthScreen>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
     final sw = MediaQuery.of(context).size.width;
     final sh = MediaQuery.of(context).size.height;
 
     return Scaffold(
-      backgroundColor: _bgAccent,
+      backgroundColor: theme.surface,
       body: Stack(
         children: [
           // ─── BACKGROUND BLOBS ───
           Positioned(
             top: -sh * 0.07,
             left: -sw * 0.18,
-            child: _Blob(size: sw * 0.85, color: _primaryBlue.withOpacity(0.09)),
+            child: _Blob(size: sw * 0.85, color: _facultyIndigo.withOpacity(0.09)),
           ),
           Positioned(
             bottom: -sh * 0.06,
             right: -sw * 0.14,
-            child: _Blob(size: sw * 0.65, color: _primaryBlue.withOpacity(0.07)),
+            child: _Blob(size: sw * 0.65, color: _facultyIndigo.withOpacity(0.07)),
           ),
 
           // ─── MAIN CONTENT ───
@@ -94,11 +88,11 @@ class _FacultyAuthScreenState extends State<FacultyAuthScreen>
                         ..setEntry(3, 2, 0.0012)
                         ..rotateY(angle),
                       child: showFront
-                          ? _FacultyLoginCard(onFlip: _flip) // Renamed Card
+                          ? _FacultyLoginCard(onFlip: _flip) 
                           : Transform(
                               alignment: Alignment.center,
                               transform: Matrix4.identity()..rotateY(pi),
-                              child: _FacultyRegisterCard(onFlip: _flip), // Renamed Card
+                              child: _FacultyRegisterCard(onFlip: _flip), 
                             ),
                     );
                   },
@@ -120,18 +114,18 @@ class _FacultyAuthScreenState extends State<FacultyAuthScreen>
                     width: 44,
                     height: 44,
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: theme.surfaceContainerHighest,
                       shape: BoxShape.circle,
-                      boxShadow: const [
+                      boxShadow: [
                         BoxShadow(
-                          color: Colors.black12,
+                          color: Colors.black.withOpacity(0.08),
                           blurRadius: 6,
                         ),
                       ],
                     ),
                     child: IconButton(
                       icon: const Icon(Icons.arrow_back),
-                      color: Colors.black87,
+                      color: theme.onSurface,
                       onPressed: () {
                         if (_showRegister) {
                           _flip(); // go back to login
@@ -150,7 +144,6 @@ class _FacultyAuthScreenState extends State<FacultyAuthScreen>
     );
   }
 }
-
 
 // ─── BLOB ─────────────────────────────────────────────────────────────────────
 class _Blob extends StatelessWidget {
@@ -172,28 +165,31 @@ class _CardShell extends StatelessWidget {
   const _CardShell({required this.child});
 
   @override
-  Widget build(BuildContext context) => Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 30),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: _teal.withOpacity(0.10),
-              blurRadius: 40,
-              spreadRadius: 2,
-              offset: const Offset(0, 12),
-            ),
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: child,
-      );
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 30),
+      decoration: BoxDecoration(
+        color: theme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: _teal.withOpacity(0.10),
+            blurRadius: 40,
+            spreadRadius: 2,
+            offset: const Offset(0, 12),
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
 }
 
 // ─── LOGIN CARD ───────────────────────────────────────────────────────────────
@@ -270,8 +266,7 @@ class _FacultyLoginCardState extends State<_FacultyLoginCard> {
 
   @override
   Widget build(BuildContext context) {
-    // Assuming _primaryBlue and _textDark are defined in your main state class
-    const primaryColor = Color(0xFF303F9F); 
+    final theme = Theme.of(context).colorScheme;
 
     return _CardShell(
       child: Form(
@@ -288,7 +283,7 @@ class _FacultyLoginCardState extends State<_FacultyLoginCard> {
                   height: 44,
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [primaryColor, Color(0xFF1A237E)],
+                      colors: [_facultyIndigo, Color(0xFF1A237E)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
@@ -298,16 +293,16 @@ class _FacultyLoginCardState extends State<_FacultyLoginCard> {
                       color: Colors.white, size: 22),
                 ),
                 const SizedBox(width: 14),
-                const Column(
+                Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Faculty Sign In',
                         style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w800,
-                            color: Color(0xFF1A1C1E))),
+                            color: theme.onSurface)),
                     Text('Access your academic portal',
-                        style: TextStyle(fontSize: 12, color: Colors.grey)),
+                        style: TextStyle(fontSize: 12, color: theme.onSurfaceVariant)),
                   ],
                 ),
               ],
@@ -315,7 +310,7 @@ class _FacultyLoginCardState extends State<_FacultyLoginCard> {
 
             const SizedBox(height: 28),
 
-            _Label('University Email'),
+            const _Label('University Email'),
             const SizedBox(height: 6),
             _Field(
               controller: _emailCtrl,
@@ -330,7 +325,7 @@ class _FacultyLoginCardState extends State<_FacultyLoginCard> {
 
             const SizedBox(height: 14),
 
-            _Label('Password'),
+            const _Label('Password'),
             const SizedBox(height: 6),
             _Field(
               controller: _passCtrl,
@@ -351,7 +346,7 @@ class _FacultyLoginCardState extends State<_FacultyLoginCard> {
               child: ElevatedButton(
                 onPressed: _isLoading ? null : _submitLogin,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryColor,
+                  backgroundColor: _facultyIndigo,
                   foregroundColor: Colors.white,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
@@ -487,7 +482,7 @@ class _FacultyRegisterCardState extends State<_FacultyRegisterCard> {
 
   @override
   Widget build(BuildContext context) {
-    const primaryBlue = Color(0xFF303F9F);
+    final theme = Theme.of(context).colorScheme;
 
     return _CardShell(
       child: Form(
@@ -504,7 +499,7 @@ class _FacultyRegisterCardState extends State<_FacultyRegisterCard> {
                   height: 44,
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [primaryBlue, Color(0xFF1A237E)],
+                      colors: [_facultyIndigo, Color(0xFF1A237E)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
@@ -514,16 +509,16 @@ class _FacultyRegisterCardState extends State<_FacultyRegisterCard> {
                       color: Colors.white, size: 22),
                 ),
                 const SizedBox(width: 14),
-                const Column(
+                Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Faculty Registry',
                         style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w800,
-                            color: Color(0xFF1A1C1E))),
+                            color: theme.onSurface)),
                     Text('Create your academic profile',
-                        style: TextStyle(fontSize: 12, color: Colors.grey)),
+                        style: TextStyle(fontSize: 12, color: theme.onSurfaceVariant)),
                   ],
                 ),
               ],
@@ -531,7 +526,7 @@ class _FacultyRegisterCardState extends State<_FacultyRegisterCard> {
 
             const SizedBox(height: 24),
 
-            _Label('Full Name'),
+            const _Label('Full Name'),
             const SizedBox(height: 6),
             _Field(
               controller: _nameCtrl,
@@ -543,7 +538,7 @@ class _FacultyRegisterCardState extends State<_FacultyRegisterCard> {
 
             const SizedBox(height: 12),
 
-            _Label('Department'),
+            const _Label('Department'),
             const SizedBox(height: 6),
             _Field(
               controller: _deptCtrl,
@@ -555,7 +550,7 @@ class _FacultyRegisterCardState extends State<_FacultyRegisterCard> {
 
             const SizedBox(height: 12),
 
-            _Label('Designation'),
+            const _Label('Designation'),
             const SizedBox(height: 6),
             _Field(
               controller: _designationCtrl,
@@ -567,7 +562,7 @@ class _FacultyRegisterCardState extends State<_FacultyRegisterCard> {
 
             const SizedBox(height: 12),
 
-            _Label('University Email'),
+            const _Label('University Email'),
             const SizedBox(height: 6),
             _Field(
               controller: _emailCtrl,
@@ -583,7 +578,7 @@ class _FacultyRegisterCardState extends State<_FacultyRegisterCard> {
 
             const SizedBox(height: 12),
 
-            _Label('Password'),
+            const _Label('Password'),
             const SizedBox(height: 6),
             _Field(
               controller: _passCtrl,
@@ -599,7 +594,7 @@ class _FacultyRegisterCardState extends State<_FacultyRegisterCard> {
 
             const SizedBox(height: 12),
 
-            _Label('Confirm Password'),
+            const _Label('Confirm Password'),
             const SizedBox(height: 6),
             _Field(
               controller: _confirmCtrl,
@@ -621,7 +616,7 @@ class _FacultyRegisterCardState extends State<_FacultyRegisterCard> {
               child: ElevatedButton(
                 onPressed: _isLoading ? null : _submitRegister,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryBlue,
+                  backgroundColor: _facultyIndigo,
                   foregroundColor: Colors.white,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
@@ -664,8 +659,10 @@ class _Label extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Text(
         text,
-        style: const TextStyle(
-            fontSize: 13, fontWeight: FontWeight.w600, color: _textDark),
+        style: TextStyle(
+            fontSize: 13, 
+            fontWeight: FontWeight.w600, 
+            color: Theme.of(context).colorScheme.onSurface),
       );
 }
 
@@ -696,25 +693,27 @@ class _FieldState extends State<_Field> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
+
     return TextFormField(
       controller: widget.controller,
       obscureText: widget.obscure && _hide,
       keyboardType: widget.keyboardType,
       validator: widget.validator,
       autovalidateMode: AutovalidateMode.onUserInteraction,
-      style: const TextStyle(
-          fontSize: 14, color: _textDark, fontWeight: FontWeight.w500),
+      style: TextStyle(
+          fontSize: 14, color: theme.onSurface, fontWeight: FontWeight.w500),
       decoration: InputDecoration(
         hintText: widget.hint,
-        hintStyle: const TextStyle(color: Color(0xFFADB5BD), fontSize: 14),
+        hintStyle: TextStyle(color: theme.onSurfaceVariant.withOpacity(0.6), fontSize: 14),
         filled: true,
-        fillColor: _fieldBg,
+        fillColor: theme.surface,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
         errorStyle: const TextStyle(
             fontSize: 11, color: Color(0xFFEF4444), height: 1.3),
         prefixIcon:
-            Icon(widget.icon, color: const Color(0xFF94A3B8), size: 18),
+            Icon(widget.icon, color: theme.onSurfaceVariant.withOpacity(0.8), size: 18),
         suffixIcon: widget.obscure
             ? IconButton(
                 icon: Icon(
@@ -722,22 +721,22 @@ class _FieldState extends State<_Field> {
                       ? Icons.visibility_off_outlined
                       : Icons.visibility_outlined,
                   size: 17,
-                  color: const Color(0xFF94A3B8),
+                  color: theme.onSurfaceVariant.withOpacity(0.8),
                 ),
                 onPressed: () => setState(() => _hide = !_hide),
               )
             : null,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: _border, width: 1.3),
+          borderSide: BorderSide(color: theme.outline, width: 1.3),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: _border, width: 1.3),
+          borderSide: BorderSide(color: theme.outline, width: 1.3),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: _teal, width: 1.8),
+          borderSide: const BorderSide(color: _facultyIndigo, width: 1.8),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -760,7 +759,10 @@ class _InkLink extends StatelessWidget {
   const _InkLink({required this.plain, required this.linked, required this.onTap});
 
   @override
-  Widget build(BuildContext context) => Material(
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
+
+    return Material(
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(6),
         child: InkWell(
@@ -775,7 +777,7 @@ class _InkLink extends StatelessWidget {
                 children: [
                   TextSpan(
                       text: plain,
-                      style: const TextStyle(fontSize: 13, color: _textGrey)),
+                      style: TextStyle(fontSize: 13, color: theme.onSurfaceVariant)),
                   TextSpan(
                       text: linked,
                       style: const TextStyle(
@@ -788,4 +790,5 @@ class _InkLink extends StatelessWidget {
           ),
         ),
       );
+  }
 }

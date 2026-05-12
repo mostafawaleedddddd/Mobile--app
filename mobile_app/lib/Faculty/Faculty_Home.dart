@@ -1,24 +1,15 @@
 // import 'dart:typed_data';
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-// import 'Faculty_Model.dart';
+import 'package:provider/provider.dart';
+import '../theme_provider.dart';
 import 'Faculty_Session.dart';
-// import 'Faculty_Auth.dart';
-// Assuming these are your existing imports for navigation
-// import 'package:your_app/user_role_screen.dart';
 
 final _db = Supabase.instance.client;
 
-// ─── COLORS ────────────────────────────────
 const Color _facultyIndigo = Color(0xFF303F9F);
-const Color _facultyIndigoLight = Color(0xFFEEF0FF);
-const Color _facultyIndigoPale = Color(0xFFF5F6FF);
 const Color _accentTeal = Color(0xFF26A69A);
-const Color _white = Colors.white;
-const Color _textDark = Color(0xFF1E293B);
-const Color _textGrey = Color(0xFF64748B);
 
 class FacultyHomePage extends StatefulWidget {
   final int facultyId;
@@ -48,19 +39,23 @@ class _FacultyHomePageState extends State<FacultyHomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: IndexedStack(index: _currentIndex, children: _pages),
+      // Removed the floatingActionButton entirely
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
-          boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10)],
+          boxShadow: [
+            BoxShadow(
+              color: Theme.of(context).colorScheme.shadow.withOpacity(0.1), 
+              blurRadius: 10
+            )
+          ],
         ),
         child: BottomNavigationBar(
           currentIndex: _currentIndex,
           onTap: (index) => setState(() => _currentIndex = index),
           type: BottomNavigationBarType.fixed,
-          backgroundColor: Colors.white,
-          selectedItemColor: const Color(
-            0xFF26A69A,
-          ), // Matching your Teal Dashboard color
-          unselectedItemColor: Colors.grey[500],
+          backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+          selectedItemColor: Theme.of(context).colorScheme.primary,
+          unselectedItemColor: Theme.of(context).colorScheme.onSurfaceVariant,
           selectedLabelStyle: const TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 12,
@@ -113,14 +108,32 @@ class _ReviewQueuePageState extends State<ReviewQueuePage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _facultyIndigoPale,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        title: const Text("Faculty Vetting"),
-        backgroundColor: _facultyIndigoPale,
+        title: Text("Faculty Vetting", style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
+        backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
+        actions: [
+          Consumer<ThemeProvider>(
+            builder: (context, themeProvider, child) => IconButton(
+              onPressed: () => themeProvider.toggleTheme(),
+              icon: Icon(
+                themeProvider.isDarkMode
+                    ? Icons.dark_mode_rounded
+                    : Icons.light_mode_rounded,
+                color: _facultyIndigo,
+                size: 24,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
         bottom: TabBar(
           controller: _tabController,
+          labelColor: Theme.of(context).colorScheme.primary,
+          unselectedLabelColor: Theme.of(context).colorScheme.onSurfaceVariant,
+          indicatorColor: Theme.of(context).colorScheme.primary,
           tabs: const [
             Tab(text: "Internships"),
             Tab(text: "Certificates"),
@@ -156,17 +169,24 @@ class _ReviewQueuePageState extends State<ReviewQueuePage>
 
   // ✅ USERS WITH CERTIFICATES
   Widget _buildUsersWithCertificates() {
+    final theme = Theme.of(context).colorScheme;
+    
     return FutureBuilder<List<Map<String, dynamic>>>(
       future: _db.from('Certificates').select(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
+          return Center(child: CircularProgressIndicator(color: theme.primary));
         }
 
         final certificates = snapshot.data!;
 
         if (certificates.isEmpty) {
-          return const Center(child: Text("No certificates uploaded yet."));
+          return Center(
+            child: Text(
+              "No certificates uploaded yet.", 
+              style: TextStyle(color: theme.onSurfaceVariant)
+            )
+          );
         }
 
         // ✅ GROUP BY user_id
@@ -186,7 +206,7 @@ class _ReviewQueuePageState extends State<ReviewQueuePage>
           future: _db.from('User_profile').select().inFilter('id', userIds),
           builder: (context, userSnapshot) {
             if (!userSnapshot.hasData) {
-              return const Center(child: CircularProgressIndicator());
+              return Center(child: CircularProgressIndicator(color: theme.primary));
             }
 
             final users = userSnapshot.data!;
@@ -203,11 +223,19 @@ class _ReviewQueuePageState extends State<ReviewQueuePage>
                 final count = grouped[userId]?.length ?? 0;
 
                 return Card(
+                  color: theme.surfaceContainerHighest,
+                  elevation: 0,
+                  margin: const EdgeInsets.only(bottom: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   child: ListTile(
-                    leading: CircleAvatar(child: Text(name[0].toUpperCase())),
-                    title: Text(name),
-                    subtitle: Text("$count certificate(s)"),
-                    trailing: const Icon(Icons.arrow_forward_ios),
+                    leading: CircleAvatar(
+                      backgroundColor: theme.primary.withOpacity(0.1),
+                      foregroundColor: theme.primary,
+                      child: Text(name[0].toUpperCase())
+                    ),
+                    title: Text(name, style: TextStyle(color: theme.onSurface, fontWeight: FontWeight.bold)),
+                    subtitle: Text("$count certificate(s)", style: TextStyle(color: theme.onSurfaceVariant)),
+                    trailing: Icon(Icons.arrow_forward_ios, size: 16, color: theme.onSurfaceVariant),
                     onTap: () {
                       _showCertificates(userId, name);
                     },
@@ -223,50 +251,68 @@ class _ReviewQueuePageState extends State<ReviewQueuePage>
 
   // ✅ SHOW CERTIFICATES
   void _showCertificates(int userId, String name) {
+    final theme = Theme.of(context).colorScheme;
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (context) {
         return DraggableScrollableSheet(
           initialChildSize: 0.85,
           builder: (_, scrollController) {
-            return FutureBuilder<List<Map<String, dynamic>>>(
-              future: _db
-                  .from('Certificates')
-                  .select()
-                  .eq('user_id', userId)
-                  .limit(20),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+            return Container(
+              decoration: BoxDecoration(
+                color: theme.surface,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: FutureBuilder<List<Map<String, dynamic>>>(
+                future: _db
+                    .from('Certificates')
+                    .select()
+                    .eq('user_id', userId)
+                    .limit(20),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return Center(child: CircularProgressIndicator(color: theme.primary));
+                  }
 
-                final certs = snapshot.data!;
+                  final certs = snapshot.data!;
 
-                if (certs.isEmpty) {
-                  return const Center(child: Text("No certificates found."));
-                }
+                  if (certs.isEmpty) {
+                    return Center(
+                      child: Text(
+                        "No certificates found.",
+                        style: TextStyle(color: theme.onSurfaceVariant)
+                      )
+                    );
+                  }
 
-                return Column(
-                  children: [
-                    const SizedBox(height: 10),
-                    Text(
-                      "Certificates: $name",
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                  return Column(
+                    children: [
+                      const SizedBox(height: 12),
+                      Container(width: 40, height: 4, decoration: BoxDecoration(color: theme.outline, borderRadius: BorderRadius.circular(2))),
+                      const SizedBox(height: 16),
+                      Text(
+                        "Certificates: $name",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: theme.onSurface,
+                        ),
                       ),
-                    ),
-                    Expanded(
-                      child: ListView.builder(
-                        controller: scrollController,
-                        itemCount: certs.length,
-                        itemBuilder: (context, i) => _certificateCard(certs[i]),
+                      const SizedBox(height: 10),
+                      Expanded(
+                        child: ListView.builder(
+                          controller: scrollController,
+                          itemCount: certs.length,
+                          itemBuilder: (context, i) => _certificateCard(certs[i]),
+                        ),
                       ),
-                    ),
-                  ],
-                );
-              },
+                    ],
+                  );
+                },
+              ),
             );
           },
         );
@@ -276,6 +322,7 @@ class _ReviewQueuePageState extends State<ReviewQueuePage>
 
   // ✅ CERTIFICATE CARD
   Widget _certificateCard(Map<String, dynamic> cert) {
+    final theme = Theme.of(context).colorScheme;
     final imageUrl = cert['image_url'] ?? '';
 
     Widget imageWidget = const SizedBox();
@@ -284,22 +331,32 @@ class _ReviewQueuePageState extends State<ReviewQueuePage>
       if (imageUrl.startsWith('data:image')) {
         try {
           final bytes = base64Decode(imageUrl.split(',').last);
-          imageWidget = Image.memory(bytes, height: 200, fit: BoxFit.cover);
+          imageWidget = Image.memory(bytes, height: 200, width: double.infinity, fit: BoxFit.cover);
         } catch (e) {
-          imageWidget = const Text("Invalid image");
+          imageWidget = Container(
+            height: 200, 
+            width: double.infinity, 
+            color: theme.surfaceContainerHighest,
+            child: const Center(child: Text("Invalid image"))
+          );
         }
       } else {
-        imageWidget = Image.network(imageUrl, height: 200, fit: BoxFit.cover);
+        imageWidget = Image.network(imageUrl, height: 200, width: double.infinity, fit: BoxFit.cover);
       }
     }
 
     return Card(
-      margin: const EdgeInsets.all(10),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: theme.surfaceContainerHighest,
+      clipBehavior: Clip.antiAlias,
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           ListTile(
-            title: Text(cert['title'] ?? ''),
-            subtitle: Text(cert['date']?.toString() ?? ''),
+            title: Text(cert['title'] ?? '', style: TextStyle(color: theme.onSurface, fontWeight: FontWeight.bold)),
+            subtitle: Text(cert['date']?.toString() ?? '', style: TextStyle(color: theme.onSurfaceVariant)),
           ),
 
           // ✅ CLICK TO ENLARGE
@@ -308,36 +365,44 @@ class _ReviewQueuePageState extends State<ReviewQueuePage>
             child: imageWidget,
           ),
 
-          Row(
-            children: [
-              Expanded(
-                child: TextButton(
-                  onPressed: () async {
-                    await _db
-                        .from('Certificates')
-                        .delete()
-                        .eq('id', cert['id']);
-                    Navigator.pop(context);
-                  },
-                  child: const Text(
-                    "Reject",
-                    style: TextStyle(color: Colors.red),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    onPressed: () async {
+                      await _db
+                          .from('Certificates')
+                          .delete()
+                          .eq('id', cert['id']);
+                      Navigator.pop(context);
+                    },
+                    child: const Text(
+                      "Reject",
+                      style: TextStyle(color: Colors.red),
+                    ),
                   ),
                 ),
-              ),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () async {
-                    await _db
-                        .from('Certificates')
-                        .update({'is_verified': true})
-                        .eq('id', cert['id']);
-                    Navigator.pop(context);
-                  },
-                  child: const Text("Accept"),
+                Expanded(
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: theme.primary,
+                      foregroundColor: theme.onPrimary,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    onPressed: () async {
+                      await _db
+                          .from('Certificates')
+                          .update({'is_verified': true})
+                          .eq('id', cert['id']);
+                      Navigator.pop(context);
+                    },
+                    child: const Text("Accept"),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
@@ -358,7 +423,6 @@ class _ReviewQueuePageState extends State<ReviewQueuePage>
               maxScale: 5,
               child: Center(child: _buildFullImage(imageUrl)),
             ),
-
             Positioned(
               top: 40,
               right: 20,
@@ -391,6 +455,8 @@ class _ReviewQueuePageState extends State<ReviewQueuePage>
   }
 
   Widget _buildInternshipList() {
+    final theme = Theme.of(context).colorScheme;
+    
     return FutureBuilder<List<Map<String, dynamic>>>(
       future: _db
           .from('Job_postings')
@@ -398,18 +464,22 @@ class _ReviewQueuePageState extends State<ReviewQueuePage>
           .order('created_at', ascending: false),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
+          return Center(child: CircularProgressIndicator(color: theme.primary));
         }
 
         final internships = snapshot.data!;
 
         if (internships.isEmpty) {
-          return const Center(
-            child: Text("No internship postings submitted yet."),
+          return Center(
+            child: Text(
+              "No internship postings submitted yet.",
+              style: TextStyle(color: theme.onSurfaceVariant),
+            ),
           );
         }
 
         return RefreshIndicator(
+          color: theme.primary,
           onRefresh: () async => setState(() {}),
           child: ListView.builder(
             padding: const EdgeInsets.all(16),
@@ -425,6 +495,9 @@ class _ReviewQueuePageState extends State<ReviewQueuePage>
                   : 'Unknown date';
 
               return Card(
+                color: theme.surfaceContainerHighest,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 margin: const EdgeInsets.only(bottom: 14),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -433,30 +506,32 @@ class _ReviewQueuePageState extends State<ReviewQueuePage>
                     children: [
                       Text(
                         company,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
+                          color: theme.onSurface,
                         ),
                       ),
                       const SizedBox(height: 6),
                       Text(
                         title,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
+                          color: theme.onSurface,
                         ),
                       ),
                       const SizedBox(height: 6),
                       Text(
                         location,
-                        style: const TextStyle(color: Colors.grey),
+                        style: TextStyle(color: theme.onSurfaceVariant),
                       ),
                       const SizedBox(height: 10),
                       Text(
                         'Submitted: $createdAt',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey,
+                          color: theme.onSurfaceVariant,
                         ),
                       ),
                       const SizedBox(height: 14),
@@ -489,20 +564,23 @@ class _ReviewQueuePageState extends State<ReviewQueuePage>
   }
 
   Future<void> _denyPosting(Map<String, dynamic> posting) async {
+    final theme = Theme.of(context).colorScheme;
     final id = posting['id'];
     if (id == null) return;
 
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Deny Internship'),
-        content: const Text(
+        backgroundColor: theme.surfaceContainerHighest,
+        title: Text('Deny Internship', style: TextStyle(color: theme.onSurface)),
+        content: Text(
           'Are you sure you want to deny and remove this internship posting?',
+          style: TextStyle(color: theme.onSurfaceVariant),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            style: TextButton.styleFrom(foregroundColor: Colors.black),
+            style: TextButton.styleFrom(foregroundColor: theme.onSurfaceVariant),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
@@ -538,10 +616,9 @@ class _ReviewQueuePageState extends State<ReviewQueuePage>
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// SECTION 2: ANNOUNCEMENTS (Corrected Column Names)
+// SECTION 2: ANNOUNCEMENTS
 // ──────────────────────────────────────────────────────────────────────────────
 class PostAnnouncementPage extends StatefulWidget {
-  // Pass the facultyId to this widget to satisfy the database schema
   final int facultyId;
   const PostAnnouncementPage({super.key, required this.facultyId});
 
@@ -587,7 +664,6 @@ class _PostAnnouncementPageState extends State<PostAnnouncementPage> {
       }
     } catch (e) {
       if (mounted) {
-        // This will now catch and show the correct error if any remaining schema issues exist
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text("Error: ${e.toString()}")));
@@ -599,19 +675,35 @@ class _PostAnnouncementPageState extends State<PostAnnouncementPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
     final sw = MediaQuery.of(context).size.width;
     final sh = MediaQuery.of(context).size.height;
 
     return Scaffold(
-      backgroundColor: _facultyIndigoPale,
+      backgroundColor: theme.surface,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           "Post Announcement",
-          style: TextStyle(color: _textDark, fontWeight: FontWeight.bold),
+          style: TextStyle(color: theme.onSurface, fontWeight: FontWeight.bold),
         ),
         automaticallyImplyLeading: false,
-        backgroundColor: _facultyIndigoPale,
+        backgroundColor: theme.surface,
         elevation: 0,
+        actions: [
+          Consumer<ThemeProvider>(
+            builder: (context, themeProvider, child) => IconButton(
+              onPressed: () => themeProvider.toggleTheme(),
+              icon: Icon(
+                themeProvider.isDarkMode
+                    ? Icons.dark_mode_rounded
+                    : Icons.light_mode_rounded,
+                color: _facultyIndigo,
+                size: 24,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: Stack(
         children: [
@@ -633,35 +725,50 @@ class _PostAnnouncementPageState extends State<PostAnnouncementPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   "Announcement Details",
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: _textDark,
+                    color: theme.onSurface,
                   ),
                 ),
                 const SizedBox(height: 20),
                 TextField(
                   controller: _titleController,
+                  style: TextStyle(color: theme.onSurface),
                   decoration: InputDecoration(
                     labelText: "Title (e.g., Internship Fair 2025)",
+                    labelStyle: TextStyle(color: theme.onSurfaceVariant),
                     filled: true,
-                    fillColor: _white,
+                    fillColor: theme.surfaceContainerHighest,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: theme.outline),
                     ),
                   ),
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
                   value: _selectedTag,
+                  dropdownColor: theme.surfaceContainerHighest,
+                  style: TextStyle(color: theme.onSurface),
                   decoration: InputDecoration(
                     labelText: "Category Tag",
+                    labelStyle: TextStyle(color: theme.onSurfaceVariant),
                     filled: true,
-                    fillColor: _white,
+                    fillColor: theme.surfaceContainerHighest,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: theme.outline),
                     ),
                   ),
                   items: _tags
@@ -675,13 +782,20 @@ class _PostAnnouncementPageState extends State<PostAnnouncementPage> {
                 TextField(
                   controller: _bodyController,
                   maxLines: 5,
+                  style: TextStyle(color: theme.onSurface),
                   decoration: InputDecoration(
                     labelText: "Announcement Description",
+                    labelStyle: TextStyle(color: theme.onSurfaceVariant),
                     alignLabelWithHint: true,
                     filled: true,
-                    fillColor: _white,
+                    fillColor: theme.surfaceContainerHighest,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: theme.outline),
                     ),
                   ),
                 ),
@@ -693,6 +807,7 @@ class _PostAnnouncementPageState extends State<PostAnnouncementPage> {
                     onPressed: _isPosting ? null : _broadcastAnnouncement,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _accentTeal,
+                      foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -702,15 +817,15 @@ class _PostAnnouncementPageState extends State<PostAnnouncementPage> {
                             width: 20,
                             height: 20,
                             child: CircularProgressIndicator(
-                              color: _white,
+                              color: Colors.white,
                               strokeWidth: 2,
                             ),
                           )
-                        : const Icon(Icons.campaign_rounded, color: _white),
+                        : const Icon(Icons.campaign_rounded, color: Colors.white),
                     label: const Text(
                       "Broadcast to Students",
                       style: TextStyle(
-                        color: _white,
+                        color: Colors.white,
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                       ),
@@ -734,19 +849,35 @@ class FacultyProfilePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
     final sw = MediaQuery.of(context).size.width;
     final sh = MediaQuery.of(context).size.height;
 
     return Scaffold(
-      backgroundColor: _facultyIndigoPale,
+      backgroundColor: theme.surface,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           "Faculty Profile",
-          style: TextStyle(color: _textDark, fontWeight: FontWeight.bold),
+          style: TextStyle(color: theme.onSurface, fontWeight: FontWeight.bold),
         ),
         automaticallyImplyLeading: false,
-        backgroundColor: _facultyIndigoPale,
+        backgroundColor: theme.surface,
         elevation: 0,
+        actions: [
+          Consumer<ThemeProvider>(
+            builder: (context, themeProvider, child) => IconButton(
+              onPressed: () => themeProvider.toggleTheme(),
+              icon: Icon(
+                themeProvider.isDarkMode
+                    ? Icons.dark_mode_rounded
+                    : Icons.light_mode_rounded,
+                color: _facultyIndigo,
+                size: 24,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: Stack(
         children: [
@@ -769,21 +900,21 @@ class FacultyProfilePage extends StatelessWidget {
               children: [
                 CircleAvatar(
                   radius: 45,
-                  backgroundColor: _facultyIndigo,
-                  child: const Icon(Icons.person, size: 45, color: _white),
+                  backgroundColor: theme.primary.withOpacity(0.1),
+                  child: Icon(Icons.person, size: 45, color: theme.primary),
                 ),
                 const SizedBox(height: 16),
                 Text(
                   FacultySession.name ?? "Faculty Member",
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: _textDark,
+                    color: theme.onSurface,
                   ),
                 ),
                 Text(
                   FacultySession.email ?? "email@university.edu",
-                  style: const TextStyle(color: _textGrey),
+                  style: TextStyle(color: theme.onSurfaceVariant),
                 ),
                 const SizedBox(height: 12),
                 Container(
@@ -792,16 +923,16 @@ class FacultyProfilePage extends StatelessWidget {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: _facultyIndigoLight,
+                    color: _facultyIndigo.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: _facultyIndigo.withOpacity(0.2)),
                   ),
                   child: Text(
                     FacultySession.department ?? "Department",
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: _facultyIndigo,
+                      color: theme.brightness == Brightness.dark ? Colors.indigo.shade200 : _facultyIndigo,
                     ),
                   ),
                 ),
@@ -814,22 +945,24 @@ class FacultyProfilePage extends StatelessWidget {
                       showDialog(
                         context: context,
                         builder: (ctx) => AlertDialog(
+                          backgroundColor: theme.surfaceContainerHighest,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
                           ),
-                          title: const Text(
+                          title: Text(
                             'Log Out',
-                            style: TextStyle(fontWeight: FontWeight.w700),
+                            style: TextStyle(fontWeight: FontWeight.w700, color: theme.onSurface),
                           ),
-                          content: const Text(
+                          content: Text(
                             'Are you sure you want to log out?',
+                            style: TextStyle(color: theme.onSurfaceVariant),
                           ),
                           actions: [
                             TextButton(
                               onPressed: () => Navigator.pop(ctx),
-                              child: const Text(
+                              child: Text(
                                 'Cancel',
-                                style: TextStyle(color: _textGrey),
+                                style: TextStyle(color: theme.onSurfaceVariant),
                               ),
                             ),
                             ElevatedButton(
@@ -842,7 +975,7 @@ class FacultyProfilePage extends StatelessWidget {
                               },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.red,
-                                foregroundColor: _white,
+                                foregroundColor: Colors.white,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(8),
                                 ),

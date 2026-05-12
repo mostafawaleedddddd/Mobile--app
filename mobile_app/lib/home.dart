@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'student/onboarding_page2.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:provider/provider.dart';
+import 'theme_provider.dart';
 // ── Page 1: Internship Seeker ──────────
 Future<void> main() async {                    
   WidgetsFlutterBinding.ensureInitialized();   
@@ -8,30 +10,38 @@ Future<void> main() async {
     url: 'https://vkkwzzrpmdkvgnxlvddz.supabase.co',
     anonKey: 'sb_publishable_q_3tICsMxAFw8x0tyMzBPQ_RrN6h_be', // your full key
   );
-  runApp(const _App());
+  runApp(
+    ChangeNotifierProvider(
+      create: (context) => ThemeProvider(),
+      child: const _App(),
+    ),
+  );
 }
 
 class _App extends StatelessWidget {
   const _App();
   @override
-  Widget build(BuildContext context) => MaterialApp(
-        debugShowCheckedModeBanner: false,
-        home: const OnboardingPage1(),
+  Widget build(BuildContext context) => Consumer<ThemeProvider>(
+        builder: (context, themeProvider, child) => MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: themeProvider.currentTheme,
+          home: const OnboardingPage1(),
+        ),
       );
 }
 
 class OnboardingPage1 extends StatelessWidget {
   const OnboardingPage1({super.key});
 
-  static const _bg         = Color(0xFFF5F3FF);   // very light lavender-white
+ // static const _bg         = Color(0xFFF5F3FF);   // very light lavender-white
  // static const _orb1       = Color(0xFF7C3AED);   // deep violet
  // static const _orb2       = Color(0xFF4F46E5);   // indigo
  // static const _orb3       = Color(0xFF06B6D4);   // cyan glow
-  static const _accent     = Color(0xFF7C3AED);
-  static const _textDark   = Color(0xFF1E1B4B);
-  static const _textBody   = Color(0xFF4B5563);
-  static const _dotActive  = Color(0xFF7C3AED);
-  static const _dotInact   = Color(0xFFD1D5DB);
+ // static const _accent     = Color(0xFF7C3AED);
+ // static const _textDark   = Color(0xFF1E1B4B);
+ // static const _textBody   = Color(0xFF4B5563);
+ // static const _dotActive  = Color(0xFF7C3AED);
+ // static const _dotInact   = Color(0xFFD1D5DB);
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +51,7 @@ class OnboardingPage1 extends StatelessWidget {
     final bodySize = sw < 380 ? 14.0 : 15.0;
 
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       body: SafeArea(
         child: Column(
           children: [
@@ -66,7 +76,7 @@ class OnboardingPage1 extends StatelessWidget {
                       style: TextStyle(
                         fontSize: titleSize,
                         fontWeight: FontWeight.w900,
-                        color: _textDark,
+                        color: Theme.of(context).colorScheme.onSurface,
                         height: 1.15,
                         letterSpacing: -0.5,
                       ),
@@ -79,7 +89,7 @@ class OnboardingPage1 extends StatelessWidget {
                       'Browse hundreds of internship opportunities, apply with one tap, upload your CV, and track every application — all in one place.',
                       style: TextStyle(
                         fontSize: bodySize,
-                        color: _textBody,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                         height: 1.6,
                       ),
                     ),
@@ -93,17 +103,17 @@ class OnboardingPage1 extends StatelessWidget {
                         // Dot indicators
                         Row(
                           children: [
-                            _Dot(active: true,  color: _dotActive, inactiveColor: _dotInact),
+                            _Dot(active: true,  color: Theme.of(context).colorScheme.primary, inactiveColor: Theme.of(context).colorScheme.outline),
                             const SizedBox(width: 8),
-                            _Dot(active: false, color: _dotActive, inactiveColor: _dotInact),
+                            _Dot(active: false, color: Theme.of(context).colorScheme.primary, inactiveColor: Theme.of(context).colorScheme.outline),
                             const SizedBox(width: 8),
-                            _Dot(active: false, color: _dotActive, inactiveColor: _dotInact),
+                            _Dot(active: false, color: Theme.of(context).colorScheme.primary, inactiveColor: Theme.of(context).colorScheme.outline),
                           ],
                         ),
 
                         // Next button
                         _NextButton(
-                          color: _accent,
+                          color: Theme.of(context).colorScheme.primary,
                           onTap: () => Navigator.of(context).push(
                             PageRouteBuilder(
                               pageBuilder: (_, a, __) => const OnboardingPage2(),
