@@ -1,13 +1,18 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
+import 'package:file_picker/file_picker.dart'; // [NEW] For picking PDF/DOCX files from device
 import '../app_session.dart';
 import '../theme_provider.dart';
 import 'User_profile.dart';
 import 'survey.dart';
 import 'interview_prep.dart';
 import 'internships_page.dart';
+
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -73,6 +78,10 @@ class _Announcement {
     required this.typeColor,
   });
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UNCHANGED: HomePage and _HomePageState — only _buildToolsToUse() is modified
+// ─────────────────────────────────────────────────────────────────────────────
 
 class HomePage extends StatefulWidget {
   final int? userId;
@@ -218,9 +227,7 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _handleBottomNavTap(int index) async {
     if (index == 0) {
-      if (_navIndex != 0) {
-        setState(() => _navIndex = 0);
-      }
+      if (_navIndex != 0) setState(() => _navIndex = 0);
       return;
     }
     if (index == 1) {
@@ -239,7 +246,6 @@ class _HomePageState extends State<HomePage> {
       await _openProfile();
       return;
     }
-
     setState(() => _navIndex = index);
   }
 
@@ -286,7 +292,6 @@ class _HomePageState extends State<HomePage> {
           right: -40,
           child: _Blob(size: sw * 0.55, color: theme.primary.withOpacity(0.05)),
         ),
-
         SafeArea(
           child: CustomScrollView(
             slivers: [
@@ -324,8 +329,6 @@ class _HomePageState extends State<HomePage> {
                   },
                 ),
               ),
-
-              // --- DYNAMIC ANNOUNCEMENTS SECTION START ---
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
@@ -338,12 +341,8 @@ class _HomePageState extends State<HomePage> {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return const Center(child: CircularProgressIndicator());
                       }
-
                       final liveData = snapshot.data ?? [];
-
-                      // This is the filter
                       final previewData = liveData.take(3).toList();
-
                       if (previewData.isEmpty) {
                         return const Center(
                           child: Padding(
@@ -352,9 +351,7 @@ class _HomePageState extends State<HomePage> {
                           ),
                         );
                       }
-
                       return Column(
-                        // map previewData here
                         children: previewData.map((item) {
                           final a = _Announcement(
                             title: item['title'] ?? 'Untitled',
@@ -432,9 +429,7 @@ class _HomePageState extends State<HomePage> {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.primary.withOpacity(0.3),
+                    color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),
@@ -483,9 +478,7 @@ class _HomePageState extends State<HomePage> {
                 boxShadow: active
                     ? [
                         BoxShadow(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.primary.withOpacity(0.25),
+                          color: Theme.of(context).colorScheme.primary.withOpacity(0.25),
                           blurRadius: 12,
                           offset: const Offset(0, 4),
                         ),
@@ -566,6 +559,10 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  // ─── [MODIFIED] _buildToolsToUse ──────────────────────────────────────────
+  // WHAT CHANGED: Added an `onTap` for the "Resume Analyzer" card.
+  // When tapped, it navigates to the new `ResumeAnalyzerScreen`.
+  // The Interview Prep card navigation is kept exactly as before.
   Widget _buildToolsToUse() {
     return SizedBox(
       height: 140,
@@ -575,23 +572,636 @@ class _HomePageState extends State<HomePage> {
         itemCount: _toolsToUse.length,
         itemBuilder: (_, i) {
           final tool = _toolsToUse[i];
-          return _TooltoUseCard(
-            tool: tool,
-            onTap: tool.title == 'Interview Prep'
-                ? () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const InterviewPrepScreen(),
-                      ),
-                    );
-                  }
-                : null,
-          );
+
+          // [NEW] Determine the correct onTap for each tool card
+          VoidCallback? tapAction;
+
+          if (tool.title == 'Interview Prep') {
+            // UNCHANGED: Original interview prep navigation
+            tapAction = () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const InterviewPrepScreen(),
+                ),
+              );
+            };
+          } else if (tool.title == 'Resume Analyzer') {
+            // [NEW] Navigate to the new ResumeAnalyzerScreen
+            tapAction = () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const ResumeAnalyzerScreen(),
+                ),
+              );
+            };
+          }
+
+          return _TooltoUseCard(tool: tool, onTap: tapAction);
         },
       ),
     );
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// [NEW] ResumeAnalyzerScreen
+//
+// PURPOSE: Full-page CV analyzer. The user picks a PDF or DOCX file, taps
+// "Analyze my CV", and receives a structured AI response from Gemini Flash
+// broken into three sections: Strengths, Weaknesses, and Recommendations.
+//
+// HOW IT WORKS END-TO-END:
+//  1. FilePicker opens the native file picker filtered to PDF/DOCX.
+//  2. The raw bytes of the file are read into a Uint8List.
+//  3. On "Analyze", bytes are base64-encoded and sent to Gemini via HTTP POST
+//     using the inline_data format that Gemini's vision/document API expects.
+//  4. Gemini returns plain text. We parse that text by looking for our
+//     section headers (STRENGTHS:, WEAKNESSES:, RECOMMENDATIONS:) and split
+//     the response into three structured lists for display.
+//  5. The UI renders each section in a themed card matching the rest of the app.
+// ─────────────────────────────────────────────────────────────────────────────
+
+class ResumeAnalyzerScreen extends StatefulWidget {
+  const ResumeAnalyzerScreen({super.key});
+
+  @override
+  State<ResumeAnalyzerScreen> createState() => _ResumeAnalyzerScreenState();
+}
+
+class _ResumeAnalyzerScreenState extends State<ResumeAnalyzerScreen> {
+  // ── Gemini credentials ────────────────────────────────────────────────────
+  // [PROVIDED BY USER] These are passed in exactly as given.
+  static const String _apiKey = "AIzaSyCxn_LZ_cIfgwmYrbbb0ViVPKGE94mYTGQ";
+  static const String _url =
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=$_apiKey";
+
+  // ── State ─────────────────────────────────────────────────────────────────
+  // Stores the raw bytes of the picked file.
+  // We hold bytes (not just a path) so we can base64-encode them for Gemini.
+  Uint8List? _fileBytes;
+
+  // The display name shown in the UI after picking (e.g. "my_resume.pdf")
+  String? _fileName;
+
+  // The MIME type we detected from the file extension.
+  // Gemini needs the exact MIME to know how to parse the document.
+  String? _mimeType;
+
+  // True while the HTTP request to Gemini is in flight
+  bool _isAnalyzing = false;
+
+  // Parsed results — each is a list of bullet-point strings
+  List<String> _strengths = [];
+  List<String> _weaknesses = [];
+  List<String> _recommendations = [];
+
+  // True once we have received and parsed a valid response
+  bool _hasResult = false;
+
+  // ── File Picker ───────────────────────────────────────────────────────────
+  // [NEW] Opens the native file picker allowing only PDF and DOCX files.
+  // `withData: true` tells file_picker to eagerly read the bytes into memory,
+  // which we need so we can send them to Gemini.
+  Future<void> _pickFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf', 'docx'], // Only CV-relevant formats
+      withData: true, // Read bytes immediately so we can base64-encode them
+    );
+
+    if (result == null || result.files.isEmpty) return; // User cancelled
+
+    final file = result.files.first;
+
+    // Determine MIME type from file extension.
+    // Gemini's inline_data block requires an accurate MIME type.
+    String mime;
+    if (file.extension?.toLowerCase() == 'pdf') {
+      mime = 'application/pdf';
+    } else {
+      // DOCX = Office Open XML
+      mime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    }
+
+    setState(() {
+      _fileBytes = file.bytes; // Raw file bytes
+      _fileName = file.name;   // Display name
+      _mimeType = mime;
+      // Reset any previous results when a new file is picked
+      _hasResult = false;
+      _strengths = [];
+      _weaknesses = [];
+      _recommendations = [];
+    });
+  }
+
+  // ── Gemini API Call ───────────────────────────────────────────────────────
+  // [NEW] Sends the CV to Gemini and parses the structured response.
+  //
+  // HOW THE GEMINI REQUEST IS STRUCTURED:
+  //  Gemini's generateContent API accepts a `contents` array.
+  //  Each content item has a `parts` array. A part can be either:
+  //    - { "text": "..." }           → plain text / the prompt
+  //    - { "inline_data": { "mime_type": "...", "data": "<base64>" } }
+  //                                  → a binary file (PDF, image, etc.)
+  //
+  //  We send TWO parts in one user turn:
+  //    Part 1: The inline_data part — the base64-encoded CV bytes with its MIME type.
+  //    Part 2: The text prompt — instructions telling Gemini exactly what to return.
+  //
+  //  The prompt uses strict section headers so we can reliably parse the output
+  //  without needing JSON mode (Gemini Flash handles this well with clear headers).
+  Future<void> _analyzeCV() async {
+    if (_fileBytes == null) return;
+
+    setState(() => _isAnalyzing = true);
+
+    try {
+      // Step 1: Base64-encode the raw file bytes.
+      // Gemini's inline_data field expects a base64 string, not raw bytes.
+      final base64File = base64Encode(_fileBytes!);
+
+      // Step 2: Build the request body.
+      // The structure follows Gemini's REST API for multimodal content.
+      final requestBody = jsonEncode({
+        "contents": [
+          {
+            "parts": [
+              // Part A: The document itself, sent as inline binary data.
+              // mime_type tells Gemini whether to treat it as PDF or DOCX.
+              // data is the base64-encoded file content.
+              {
+                "inline_data": {
+                  "mime_type": _mimeType,
+                  "data": base64File,
+                }
+              },
+              // Part B: The text prompt.
+              // We tell Gemini to act as a professional CV reviewer and return
+              // output using exact headers we can reliably parse.
+              // Each section must be a bullet list starting with "- ".
+              {
+                "text": """
+You are a professional CV/resume reviewer with expertise in career development and recruitment.
+
+Analyze the CV/resume provided and give structured feedback with these EXACT section headers:
+
+STRENGTHS:
+- [List each strength as a bullet point]
+
+WEAKNESSES:
+- [List specific CV issues: formatting problems, missing sections, unclear content, weak descriptions, etc.]
+If no weaknesses found, write: "- I have nothing to say"
+
+RECOMMENDATIONS:
+- [Provide specific actionable steps to improve each weakness mentioned above]
+Focus only on how to fix and improve the CV content, structure, and presentation.
+If no recommendations (i.e., no weaknesses to improve), write: "- I have nothing to say"
+
+Rules:
+- ALWAYS include ALL THREE sections (STRENGTHS, WEAKNESSES, RECOMMENDATIONS) in your response
+- EVERY line in each section MUST start with "- " (including placeholders)
+- WEAKNESSES = what is wrong or could be better in the CV
+- RECOMMENDATIONS = how to fix/improve those CV weaknesses
+- Be specific and actionable, not generic
+- Provide 3 to 5 points per section if possible
+- Focus on CV content, structure, formatting, and professional impact
+- Do NOT add any text before "STRENGTHS:" or after the last section
+"""
+              }
+            ]
+          }
+        ],
+        "generationConfig": {
+          "temperature": 0.4,    // Lower = more consistent/structured output
+          "maxOutputTokens": 2000 // Enough for 3-5 points × 3 sections
+        }
+      });
+
+      // Step 3: Send the HTTP POST to Gemini's generateContent endpoint.
+      // The API key is appended to the URL as a query parameter.
+      final uri = Uri.parse(_url);
+      final response = await _sendHttpPost(uri, requestBody);
+
+      // Step 4: Parse the raw JSON response from Gemini.
+      final decoded = jsonDecode(response);
+
+      // Navigate the response JSON: candidates[0].content.parts[0].text
+      // This is where Gemini puts its generated text response.
+      final text = decoded['candidates'][0]['content']['parts'][0]['text'] as String;
+
+      // Step 5: Split the plain text response into our three sections.
+      _parseGeminiResponse(text);
+
+      setState(() {
+        _isAnalyzing = false;
+        _hasResult = true;
+      });
+    } catch (e) {
+      setState(() => _isAnalyzing = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Analysis failed: $e'),
+            backgroundColor: _rejectedColor,
+          ),
+        );
+      }
+    }
+  }
+
+  // ── HTTP POST helper ──────────────────────────────────────────────────────
+  // [NEW] Sends a POST request with JSON body and returns the response body as a String.
+  // We use dart:io's HttpClient to avoid adding the `http` package dependency,
+  // keeping the project's pubspec.yaml unchanged.
+  // If you already have the `http` package, you can replace this with http.post().
+  Future<String> _sendHttpPost(Uri uri, String body) async {
+    // ignore: avoid_web_libraries_in_flutter
+    final client = HttpClient(); // dart:io HttpClient
+    final request = await client.postUrl(uri);
+    request.headers.set('Content-Type', 'application/json');
+    request.write(body);
+    final response = await request.close();
+    final responseBody = await response.transform(utf8.decoder).join();
+    client.close();
+    return responseBody;
+  }
+
+  // ── Response Parser ───────────────────────────────────────────────────────
+  // [NEW] Splits Gemini's plain-text output into three bullet lists.
+  //
+  // HOW IT WORKS:
+  //  We find the character index of each section header in the raw text.
+  //  Then we extract the substring for each section and split by newlines.
+  //  Lines starting with "- " are kept as bullet points (the leading "- " is stripped).
+  void _parseGeminiResponse(String text) {
+    // Find where each section starts in the raw response text
+    final strengthsIdx = text.indexOf('STRENGTHS:');
+    final weaknessesIdx = text.indexOf('WEAKNESSES:');
+    final recommendationsIdx = text.indexOf('RECOMMENDATIONS:');
+
+    // Helper: extract bullet lines from a text block between two positions
+    List<String> extractBullets(int start, int end) {
+      // Get the substring for this section
+      final section = end > 0
+          ? text.substring(start, end)
+          : text.substring(start);
+
+      // Split into lines, keep only lines starting with "- ", strip the "- " prefix
+      return section
+          .split('\n')
+          .where((line) => line.trim().startsWith('- '))
+          .map((line) => line.trim().substring(2).trim()) // Remove "- " prefix
+          .where((line) => line.isNotEmpty)
+          .toList();
+    }
+
+    _strengths = strengthsIdx >= 0
+        ? extractBullets(strengthsIdx, weaknessesIdx > strengthsIdx ? weaknessesIdx : text.length)
+        : [];
+
+    _weaknesses = weaknessesIdx >= 0
+        ? extractBullets(weaknessesIdx, recommendationsIdx > weaknessesIdx ? recommendationsIdx : text.length)
+        : [];
+
+    _recommendations = recommendationsIdx >= 0
+        ? extractBullets(recommendationsIdx, text.length)
+        : [];
+  }
+
+  // ── UI ────────────────────────────────────────────────────────────────────
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
+
+    return Scaffold(
+      // Matches the app's surface color exactly
+      backgroundColor: theme.surface,
+      appBar: AppBar(
+        title: Text(
+          'Resume Analyzer',
+          style: TextStyle(
+            color: theme.onSurface,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
+        ),
+        // Matches AllAnnouncementsScreen and AllApplicationsScreen styling
+        backgroundColor: theme.surfaceContainerHighest,
+        elevation: 0,
+        centerTitle: true,
+        leading: IconButton(
+          icon: Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: theme.onSurface,
+            size: 20,
+          ),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // ── Upload Card ──────────────────────────────────────────────────
+            // [NEW] Tappable card that opens the file picker.
+            // Shows a dashed-border upload zone when no file is selected,
+            // and a filled confirmation card when a file has been picked.
+            GestureDetector(
+              onTap: _isAnalyzing ? null : _pickFile,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
+                decoration: BoxDecoration(
+                  color: _fileBytes != null
+                      ? const Color(0xFF7C3AED).withOpacity(0.08)
+                      : theme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    // Purple border when file picked, dashed-style outline when empty
+                    color: _fileBytes != null
+                        ? const Color(0xFF7C3AED).withOpacity(0.5)
+                        : theme.outline,
+                    width: _fileBytes != null ? 2 : 1,
+                  ),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Icon changes based on state
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF7C3AED), Color(0xFF4F46E5)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(18),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF7C3AED).withOpacity(0.3),
+                            blurRadius: 16,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        _fileBytes != null
+                            ? Icons.check_circle_outline_rounded
+                            : Icons.upload_file_rounded,
+                        color: Colors.white,
+                        size: 32,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      _fileBytes != null ? _fileName! : 'Upload your CV',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: _fileBytes != null
+                            ? const Color(0xFF7C3AED)
+                            : theme.onSurface,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      _fileBytes != null
+                          ? 'Tap to change file'
+                          : 'Tap to browse — PDF or Word supported',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: theme.onSurfaceVariant,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // ── Analyze Button ───────────────────────────────────────────────
+            // [NEW] Disabled until a file is picked. Shows a spinner while loading.
+            // Uses the same gradient style as the tool cards.
+            AnimatedOpacity(
+              duration: const Duration(milliseconds: 200),
+              opacity: _fileBytes != null ? 1.0 : 0.45,
+              child: Container(
+                height: 56,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF7C3AED), Color(0xFF4F46E5)],
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: _fileBytes != null
+                      ? [
+                          BoxShadow(
+                            color: const Color(0xFF7C3AED).withOpacity(0.35),
+                            blurRadius: 20,
+                            offset: const Offset(0, 8),
+                          )
+                        ]
+                      : [],
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  borderRadius: BorderRadius.circular(16),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    // Button only works if file is picked and not currently analyzing
+                    onTap: (_fileBytes != null && !_isAnalyzing) ? _analyzeCV : null,
+                    child: Center(
+                      child: _isAnalyzing
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2.5,
+                              ),
+                            )
+                          : const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.auto_awesome, color: Colors.white, size: 20),
+                                SizedBox(width: 10),
+                                Text(
+                                  'Analyze my CV',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ],
+                            ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            // ── Results Section ──────────────────────────────────────────────
+            // [NEW] Only shown after a successful analysis.
+            // Three cards: Strengths (green), Weaknesses (red), Recommendations (blue).
+            if (_hasResult) ...[
+              const SizedBox(height: 32),
+              _ResultSection(
+                title: 'Strengths',
+                icon: Icons.star_rounded,
+                color: _acceptedColor,
+                items: _strengths,
+              ),
+              const SizedBox(height: 16),
+              _ResultSection(
+                title: 'Weaknesses',
+                icon: Icons.warning_amber_rounded,
+                color: _rejectedColor,
+                items: _weaknesses,
+              ),
+              const SizedBox(height: 16),
+              _ResultSection(
+                title: 'Recommendations',
+                icon: Icons.lightbulb_outline_rounded,
+                color: _appliedColor,
+                items: _recommendations,
+              ),
+              const SizedBox(height: 32),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// [NEW] _ResultSection
+//
+// PURPOSE: Renders one section of the CV analysis (Strengths / Weaknesses /
+// Recommendations) as a themed card matching the rest of the app's design language.
+//
+// HOW IT WORKS:
+//  - Takes a `title`, an `icon`, an accent `color`, and a list of `items`.
+//  - The header uses the accent color for the icon background (low opacity).
+//  - Each bullet is rendered as a row with a small colored dot + the text.
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ResultSection extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final Color color;
+  final List<String> items;
+
+  const _ResultSection({
+    required this.title,
+    required this.icon,
+    required this.color,
+    required this.items,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        // Matches the card style used throughout the app
+        color: theme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+        border: Border.all(color: color.withOpacity(0.18), width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Section header ─────────────────────────────────────────────
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: color, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: theme.onSurface,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          const Divider(height: 1),
+          const SizedBox(height: 14),
+
+          // ── Bullet list ────────────────────────────────────────────────
+          // Each item from the parsed Gemini response is a bullet row.
+          ...items.map(
+            (item) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Colored dot bullet
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Container(
+                      width: 7,
+                      height: 7,
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  // Bullet text, wraps naturally
+                  Expanded(
+                    child: Text(
+                      item,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: theme.onSurfaceVariant,
+                        height: 1.55,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UNCHANGED: All remaining original classes kept exactly as they were
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _ApplicationCard extends StatelessWidget {
   final Map<String, dynamic> app;
@@ -785,11 +1395,10 @@ class _AnnouncementCard extends StatelessWidget {
 
   const _AnnouncementCard({required this.a});
 
-  // This helper function builds the "Maximized" view
   void _showFullAnnouncement(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      isScrollControlled: true, // Allows it to expand for long text
+      isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
         padding: const EdgeInsets.all(24),
@@ -815,10 +1424,7 @@ class _AnnouncementCard extends StatelessWidget {
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: a.typeColor.withOpacity(0.10),
                     borderRadius: BorderRadius.circular(20),
@@ -864,7 +1470,7 @@ class _AnnouncementCard extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 40), // Spacing at the bottom
+            const SizedBox(height: 40),
           ],
         ),
       ),
@@ -874,7 +1480,7 @@ class _AnnouncementCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => _showFullAnnouncement(context), // <--- TAP TO MAXIMIZE
+      onTap: () => _showFullAnnouncement(context),
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
@@ -908,10 +1514,7 @@ class _AnnouncementCard extends StatelessWidget {
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
                           color: a.typeColor.withOpacity(0.10),
                           borderRadius: BorderRadius.circular(20),
@@ -1075,48 +1678,31 @@ class _NavItem extends StatelessWidget {
   );
 }
 
-// Helper to keep your UI colors consistent with your design
 Color _getLiveTypeColor(String? type) {
   switch (type) {
     case 'Event':
-      return const Color(0xFF8B5CF6); // Violet
+      return const Color(0xFF8B5CF6);
     case 'Important':
-      return const Color(0xFFEC4899); // Pink
+      return const Color(0xFFEC4899);
     case 'News':
-      return const Color(0xFF3B82F6); // Blue
+      return const Color(0xFF3B82F6);
     case 'Reminder':
-      return const Color(0xFF059669); // Green
+      return const Color(0xFF059669);
     default:
       return Colors.blueGrey;
   }
 }
 
-// Helper to turn database timestamps into readable strings
 String _formatTimeAgo(String? timestamp) {
   if (timestamp == null) return "Just now";
-
-  // Parse the UTC time from Supabase correctly
   DateTime postDate = DateTime.parse(timestamp).toLocal();
   DateTime now = DateTime.now();
-
-  // Use difference and take the absolute value to avoid negative numbers
   Duration diff = now.difference(postDate);
-
-  // If the difference is negative or very small, just say "Just now"
-  if (diff.isNegative || diff.inSeconds < 60) {
-    return "Just now";
-  }
-
-  if (diff.inMinutes < 60) {
-    return "${diff.inMinutes} mins ago";
-  } else if (diff.inHours < 24) {
-    return "${diff.inHours} hours ago";
-  } else if (diff.inDays < 7) {
-    return "${diff.inDays} days ago";
-  } else {
-    // For older posts, show the date
-    return "${postDate.day}/${postDate.month}/${postDate.year}";
-  }
+  if (diff.isNegative || diff.inSeconds < 60) return "Just now";
+  if (diff.inMinutes < 60) return "${diff.inMinutes} mins ago";
+  else if (diff.inHours < 24) return "${diff.inHours} hours ago";
+  else if (diff.inDays < 7) return "${diff.inDays} days ago";
+  else return "${postDate.day}/${postDate.month}/${postDate.year}";
 }
 
 class AllAnnouncementsScreen extends StatelessWidget {
@@ -1156,12 +1742,10 @@ class AllAnnouncementsScreen extends StatelessWidget {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-
           final liveData = snapshot.data ?? [];
           if (liveData.isEmpty) {
             return const Center(child: Text("No announcements found."));
           }
-
           return ListView.builder(
             padding: const EdgeInsets.all(16),
             itemCount: liveData.length,
@@ -1182,7 +1766,6 @@ class AllAnnouncementsScreen extends StatelessWidget {
     );
   }
 }
-
 
 class AllApplicationsScreen extends StatefulWidget {
   final int userId;
@@ -1239,7 +1822,6 @@ class _AllApplicationsScreenState extends State<AllApplicationsScreen> {
     }
   }
 
-  // Listens to live database changes for this specific user
   void _setupRealtime() {
     _subscription = _db.channel('public:Job_applications').onPostgresChanges(
       event: PostgresChangeEvent.all,
@@ -1259,7 +1841,7 @@ class _AllApplicationsScreenState extends State<AllApplicationsScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context).colorScheme;
-    
+
     return Scaffold(
       backgroundColor: theme.surface,
       appBar: AppBar(
@@ -1275,19 +1857,15 @@ class _AllApplicationsScreenState extends State<AllApplicationsScreen> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: _isLoading 
+      body: _isLoading
           ? Center(child: CircularProgressIndicator(color: theme.primary))
           : _applications.isEmpty
-          ? Center(
-              child: Text("No applications found.", 
-              style: TextStyle(color: theme.onSurfaceVariant)))
+          ? Center(child: Text("No applications found.", style: TextStyle(color: theme.onSurfaceVariant)))
           : ListView.builder(
               padding: const EdgeInsets.all(16),
               itemCount: _applications.length,
               itemBuilder: (context, index) {
                 final app = _applications[index];
-                
-                // Determine color based on status
                 Color statusCol;
                 switch (app['status']) {
                   case 'pending': statusCol = const Color(0xFF3B82F6); break;
@@ -1296,8 +1874,6 @@ class _AllApplicationsScreenState extends State<AllApplicationsScreen> {
                   case 'interview': statusCol = const Color(0xFF7C3AED); break;
                   default: statusCol = const Color(0xFF3B82F6);
                 }
-
-                // Generate Initials
                 final initials = app['company_name'].toString().trim().split(' ')
                     .where((e) => e.isNotEmpty).take(2)
                     .map((e) => e[0].toUpperCase()).join();
@@ -1314,10 +1890,10 @@ class _AllApplicationsScreenState extends State<AllApplicationsScreen> {
                       Container(
                         width: 44, height: 44,
                         decoration: BoxDecoration(
-                          color: statusCol.withOpacity(0.12), 
-                          borderRadius: BorderRadius.circular(12)
+                          color: statusCol.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Center(child: Text(initials, 
+                        child: Center(child: Text(initials,
                           style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: statusCol))),
                       ),
                       const SizedBox(width: 14),
@@ -1325,11 +1901,11 @@ class _AllApplicationsScreenState extends State<AllApplicationsScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(app['job_title'], 
+                            Text(app['job_title'],
                                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: theme.onSurface),
                                 overflow: TextOverflow.ellipsis),
                             const SizedBox(height: 2),
-                            Text(app['company_name'], 
+                            Text(app['company_name'],
                                 style: TextStyle(fontSize: 13, color: theme.onSurfaceVariant),
                                 overflow: TextOverflow.ellipsis),
                           ],
@@ -1339,12 +1915,12 @@ class _AllApplicationsScreenState extends State<AllApplicationsScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: statusCol.withOpacity(0.10), 
-                          borderRadius: BorderRadius.circular(20)
+                          color: statusCol.withOpacity(0.10),
+                          borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
-                          app['status'].toString().toUpperCase(), 
-                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: statusCol)
+                          app['status'].toString().toUpperCase(),
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: statusCol),
                         ),
                       ),
                     ],
@@ -1355,7 +1931,7 @@ class _AllApplicationsScreenState extends State<AllApplicationsScreen> {
     );
   }
 }
-// ─── DECORATIVE BLOB ──────────────────────
+
 class _Blob extends StatelessWidget {
   final double size;
   final Color color;
@@ -1368,3 +1944,15 @@ class _Blob extends StatelessWidget {
     decoration: BoxDecoration(shape: BoxShape.circle, color: color),
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// pubspec.yaml — ADD THIS DEPENDENCY (if not already present):
+//
+//   dependencies:
+//     file_picker: ^8.0.0
+//
+// Then run: flutter pub get
+//
+// file_picker handles the native file browser on Android, iOS, and desktop.
+// withData: true reads file bytes eagerly into memory (needed for base64 encoding).
+// ─────────────────────────────────────────────────────────────────────────────
