@@ -8,7 +8,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();   
   await Supabase.initialize(                   
     url: 'https://vkkwzzrpmdkvgnxlvddz.supabase.co',
-    anonKey: 'sb_publishable_q_3tICsMxAFw8x0tyMzBPQ_RrN6h_be', // your full key
+    anonKey: 'sb_publishable_q_3tICsMxAFw8x0tyMzBPQ_RrN6h_be', 
   );
   runApp(
     ChangeNotifierProvider(
