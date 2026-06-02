@@ -34,9 +34,6 @@ class OnboardingPage1 extends StatelessWidget {
   const OnboardingPage1({super.key});
 
   static const _bg         = Color(0xFFF5F3FF);   // very light lavender-white
-  static const _orb1       = Color(0xFF7C3AED);   // deep violet
-  static const _orb2       = Color(0xFF4F46E5);   // indigo
-  static const _orb3       = Color(0xFF06B6D4);   // cyan glow
   static const _accent     = Color(0xFF7C3AED);
   static const _textDark   = Color(0xFF1E1B4B);
   static const _textBody   = Color(0xFF4B5563);
