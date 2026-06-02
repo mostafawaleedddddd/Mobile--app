@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'student/onboarding_page2.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
 import 'theme_provider.dart';
 // ── Page 1: Internship Seeker ──────────
-Future<void> main() async {                    
-  WidgetsFlutterBinding.ensureInitialized();   
-  await Supabase.initialize(                   
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: '.env');
+       print("ENV LOADED");
+      print(dotenv.env);
+  await Supabase.initialize(
     url: 'https://vkkwzzrpmdkvgnxlvddz.supabase.co',
-    anonKey: 'sb_publishable_q_3tICsMxAFw8x0tyMzBPQ_RrN6h_be', 
+    anonKey: 'sb_publishable_q_3tICsMxAFw8x0tyMzBPQ_RrN6h_be',
   );
   runApp(
     ChangeNotifierProvider(
