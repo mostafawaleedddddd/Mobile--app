@@ -14,6 +14,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../theme_provider.dart';
 import 'company_model.dart';
 import 'company_session.dart';
@@ -43,6 +44,7 @@ class _CompanyHomePageState extends State<CompanyHomePage> {
   CompanyProfile? _company;
   List<JobPosting> _jobs = [];
   List<JobApplication> _applications = [];
+  final Set<int> _seenApplications = {};
 
   @override
   void initState() {
@@ -53,6 +55,7 @@ class _CompanyHomePageState extends State<CompanyHomePage> {
   Future<void> _loadData() async {
     setState(() => _loading = true);
     try {
+      await _loadSeenApplications();
       await Future.wait([_loadCompany(), _loadJobs()]);
       await _loadApplications();
     } catch (e) {
@@ -112,6 +115,34 @@ class _CompanyHomePageState extends State<CompanyHomePage> {
       );
     }
   }
+
+  Future<void> _loadSeenApplications() async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'company_${widget.companyId}_seen_notifications';
+    final saved = prefs.getStringList(key);
+    if (saved != null) {
+      _seenApplications
+        ..clear()
+        ..addAll(saved.map(int.tryParse).whereType<int>());
+    }
+  }
+
+  Future<void> _saveSeenApplications() async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'company_${widget.companyId}_seen_notifications';
+    await prefs.setStringList(
+      key,
+      _seenApplications.map((id) => id.toString()).toList(),
+    );
+  }
+
+  int _newApplicationsForJob(JobPosting job) => _applications
+      .where((a) =>
+          a.jobId == job.id &&
+          a.status == 'pending' &&
+          a.id != null &&
+          !_seenApplications.contains(a.id))
+      .length;
 
   Future<void> _updateStatus(JobApplication app, String status) async {
     await _db
@@ -183,6 +214,26 @@ class _CompanyHomePageState extends State<CompanyHomePage> {
     }
   }
 
+  int get _notificationCount => _applications
+      .where((a) => a.status == 'pending' && a.id != null && !_seenApplications.contains(a.id))
+      .length;
+
+  Future<void> _markAllNotificationsSeen() async {
+    setState(() {
+      for (final app in _applications) {
+        if (app.id != null) _seenApplications.add(app.id!);
+      }
+    });
+    await _saveSeenApplications();
+  }
+
+  Future<void> _markAsSeen(JobApplication app) async {
+    if (app.id == null) return;
+    if (_seenApplications.contains(app.id)) return;
+    setState(() => _seenApplications.add(app.id!));
+    await _saveSeenApplications();
+  }
+
   int get _pendingCount =>
       _applications.where((a) => a.status == 'pending').length;
 
@@ -202,6 +253,9 @@ class _CompanyHomePageState extends State<CompanyHomePage> {
         applications: _applications,
         greeting: _greeting(),
         pendingCount: _pendingCount,
+        notificationCount: _notificationCount,
+        onNotificationsOpened: _markAllNotificationsSeen,
+        newCountForJob: _newApplicationsForJob,
         onRefresh: _loadData,
         onUpdateStatus: _updateStatus,
         onRemove: _removeApplicant,
@@ -218,6 +272,7 @@ class _CompanyHomePageState extends State<CompanyHomePage> {
         applications: _applications,
         titleFor: _titleFor,
         onUpdateStatus: _updateStatus,
+        onView: _markAsSeen,
       ),
       _ProfileTab(
         company: _company,
@@ -247,6 +302,9 @@ class _DashboardTab extends StatelessWidget {
   final List<JobApplication> applications;
   final String greeting;
   final int pendingCount;
+  final int notificationCount;
+  final VoidCallback onNotificationsOpened;
+  final int Function(JobPosting) newCountForJob;
   final VoidCallback onRefresh;
   final Future<void> Function(JobApplication, String) onUpdateStatus;
   final Future<void> Function(JobApplication) onRemove;
@@ -257,6 +315,9 @@ class _DashboardTab extends StatelessWidget {
     required this.applications,
     required this.greeting,
     required this.pendingCount,
+    required this.notificationCount,
+    required this.onNotificationsOpened,
+    required this.newCountForJob,
     required this.onRefresh,
     required this.onUpdateStatus,
     required this.onRemove,
@@ -278,7 +339,12 @@ class _DashboardTab extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _DashHeader(company: company, greeting: greeting),
+              _DashHeader(
+                company: company,
+                greeting: greeting,
+                notificationCount: notificationCount,
+                onNotificationsOpened: onNotificationsOpened,
+              ),
               const SizedBox(height: 24),
               Row(
                 children: [
@@ -349,6 +415,7 @@ class _DashboardTab extends StatelessWidget {
                   (j) => _JobCard(
                     job: j,
                     applications: applications,
+                    newCount: newCountForJob(j),
                     onTap: () => _openManagement(context, j),
                   ),
                 ),
@@ -378,7 +445,14 @@ class _DashboardTab extends StatelessWidget {
 class _DashHeader extends StatelessWidget {
   final CompanyProfile? company;
   final String greeting;
-  const _DashHeader({required this.company, required this.greeting});
+  final int notificationCount;
+  final VoidCallback onNotificationsOpened;
+  const _DashHeader({
+    required this.company,
+    required this.greeting,
+    required this.notificationCount,
+    required this.onNotificationsOpened,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -456,25 +530,179 @@ class _DashHeader extends StatelessWidget {
 
         const SizedBox(width: 8),
 
-        // Notification Icon
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: theme.surfaceContainerHighest,
+        // Notification Icon (opens a popup showing recent student applications)
+        Builder(
+          builder: (iconCtx) => InkWell(
             borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.06),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Icon(
-            Icons.notifications_none_rounded,
-            color: theme.onSurfaceVariant,
-            size: 20,
+            onTap: () async {
+              if (company == null) return;
+
+              // compute anchor position
+              final renderBox = iconCtx.findRenderObject() as RenderBox?;
+              final overlay = Overlay.of(iconCtx).context.findRenderObject() as RenderBox?;
+              Rect rect = Rect.fromLTWH(0, 0, 40, 40);
+              if (renderBox != null && overlay != null) {
+                final offset = renderBox.localToGlobal(Offset.zero, ancestor: overlay);
+                rect = offset & renderBox.size;
+              }
+
+              final items = await Supabase.instance.client
+                  .from('Job_applications')
+                  .select('id, student_name, applied_at, Job_postings!inner(title, company_id)')
+                  .eq('Job_postings.company_id', company!.id)
+                  .order('applied_at', ascending: false)
+                  .then((v) => List<Map<String, dynamic>>.from(v as List));
+
+              final menuWidth = MediaQuery.of(context).size.width * 0.85;
+              final maxHeight = MediaQuery.of(context).size.height * 0.6;
+
+              String formatTimeAgo(String? ts) {
+                if (ts == null) return 'Just now';
+                try {
+                  final dt = DateTime.parse(ts).toLocal();
+                  final diff = DateTime.now().difference(dt);
+                  if (diff.inSeconds < 60) return 'Just now';
+                  if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+                  if (diff.inHours < 24) return '${diff.inHours}h ago';
+                  if (diff.inDays < 7) return '${diff.inDays}d ago';
+                  return '${dt.day}/${dt.month}/${dt.year}';
+                } catch (_) {
+                  return 'Just now';
+                }
+              }
+
+              final double itemH = 76.0;
+              final double contentHeight = ((items.length * itemH + 64).clamp(120.0, maxHeight)).toDouble();
+
+              await showMenu(
+                context: context,
+                position: RelativeRect.fromLTRB(rect.left, rect.bottom, rect.right, rect.top),
+                color: theme.surface,
+                elevation: 8,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                items: [
+                  PopupMenuItem(
+                    enabled: false,
+                    child: SizedBox(
+                      width: menuWidth,
+                      height: contentHeight,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8.0, left: 8.0, top: 8.0),
+                            child: Text('Recent Applications', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: theme.onSurface)),
+                          ),
+                          Expanded(
+                            child: items.isEmpty
+                                ? Center(child: Text('No recent applications', style: TextStyle(color: theme.onSurfaceVariant)))
+                                : ListView.separated(
+                                    shrinkWrap: true,
+                                    itemCount: items.length,
+                                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                                    separatorBuilder: (_, __) => const SizedBox(height: 8),
+                                    itemBuilder: (context, i) {
+                                      final it = items[i];
+                                      final student = (it['student_name'] ?? 'Student').toString();
+                                      String jobTitle = '';
+                                      try {
+                                        final jp = it['Job_postings'];
+                                        if (jp is Map && jp['title'] != null) jobTitle = jp['title']?.toString() ?? '';
+                                      } catch (_) {}
+                                      final appliedAt = it['applied_at']?.toString();
+
+                                      final initials = student.trim().isEmpty
+                                          ? 'S'
+                                          : student
+                                              .trim()
+                                              .split(' ')
+                                              .where((e) => e.isNotEmpty)
+                                              .take(2)
+                                              .map((e) => e[0].toUpperCase())
+                                              .join();
+
+                                      return Container(
+                                        padding: const EdgeInsets.all(12),
+                                        decoration: BoxDecoration(
+                                          color: theme.surfaceContainerHighest,
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            CircleAvatar(
+                                              radius: 18,
+                                              backgroundColor: theme.primary.withOpacity(0.12),
+                                              child: Text(initials, style: TextStyle(color: theme.primary, fontWeight: FontWeight.w800)),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(student, style: TextStyle(fontWeight: FontWeight.w800, color: theme.onSurface)),
+                                                  const SizedBox(height: 4),
+                                                  Text('Applied on: ${jobTitle}', style: TextStyle(color: theme.onSurfaceVariant, fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                                ],
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(formatTimeAgo(appliedAt), style: TextStyle(color: theme.onSurfaceVariant, fontSize: 12)),
+                                          ],
+                                        ),
+                                      );
+                                    },
+                                  ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              );
+              onNotificationsOpened();
+            },
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: theme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.06),
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Icon(Icons.notifications_none_rounded, color: theme.onSurfaceVariant, size: 20),
+                ),
+                if (notificationCount > 0)
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color.fromARGB(255, 245, 58, 11),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: theme.surface, width: 1.5),
+                      ),
+                      child: Text(
+                        '$notificationCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 8,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ],
@@ -546,10 +774,12 @@ class _StatCard extends StatelessWidget {
 class _JobCard extends StatelessWidget {
   final JobPosting job;
   final List<JobApplication> applications;
+  final int newCount;
   final VoidCallback onTap;
   const _JobCard({
     required this.job,
     required this.applications,
+    required this.newCount,
     required this.onTap,
   });
   int get _total => applications.where((a) => a.jobId == job.id).length;
@@ -1542,10 +1772,12 @@ class _ApplicantsTab extends StatefulWidget {
   final List<JobApplication> applications;
   final String Function(int) titleFor;
   final Future<void> Function(JobApplication, String) onUpdateStatus;
+  final void Function(JobApplication) onView;
   const _ApplicantsTab({
     required this.applications,
     required this.titleFor,
     required this.onUpdateStatus,
+    required this.onView,
   });
   @override
   State<_ApplicantsTab> createState() => _ApplicantsTabState();
@@ -1625,6 +1857,7 @@ class _ApplicantsTabState extends State<_ApplicantsTab> {
                       return _AppCard(
                         app: app,
                         jobTitle: widget.titleFor(app.jobId),
+                        onViewed: () => widget.onView(app),
                         onAccept: app.status == 'pending'
                             ? () => widget.onUpdateStatus(app, 'accepted')
                             : null,
@@ -1693,10 +1926,12 @@ class _Chip extends StatelessWidget {
 class _AppCard extends StatelessWidget {
   final JobApplication app;
   final String jobTitle;
+  final VoidCallback? onViewed;
   final VoidCallback? onAccept, onReject, onInterview;
   const _AppCard({
     required this.app,
     required this.jobTitle,
+    this.onViewed,
     this.onAccept,
     this.onReject,
     this.onInterview,
@@ -1741,18 +1976,21 @@ class _AppCard extends StatelessWidget {
     final theme = Theme.of(context).colorScheme;
 
     return GestureDetector(
-      onTap: () => showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (_) => _ProfileSheet(
-          app: app,
-          jobTitle: jobTitle,
-          onAccept: onAccept,
-          onReject: onReject,
-          onInterview: onInterview,
-        ),
-      ),
+      onTap: () {
+        onViewed?.call();
+        showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (_) => _ProfileSheet(
+            app: app,
+            jobTitle: jobTitle,
+            onAccept: onAccept,
+            onReject: onReject,
+            onInterview: onInterview,
+          ),
+        );
+      },
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
