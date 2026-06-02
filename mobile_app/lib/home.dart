@@ -33,15 +33,12 @@ class _App extends StatelessWidget {
 class OnboardingPage1 extends StatelessWidget {
   const OnboardingPage1({super.key});
 
- // static const _bg         = Color(0xFFF5F3FF);   // very light lavender-white
- // static const _orb1       = Color(0xFF7C3AED);   // deep violet
- // static const _orb2       = Color(0xFF4F46E5);   // indigo
- // static const _orb3       = Color(0xFF06B6D4);   // cyan glow
- // static const _accent     = Color(0xFF7C3AED);
- // static const _textDark   = Color(0xFF1E1B4B);
- // static const _textBody   = Color(0xFF4B5563);
- // static const _dotActive  = Color(0xFF7C3AED);
- // static const _dotInact   = Color(0xFFD1D5DB);
+  static const _bg         = Color(0xFFF5F3FF);   // very light lavender-white
+  static const _accent     = Color(0xFF7C3AED);
+  static const _textDark   = Color(0xFF1E1B4B);
+  static const _textBody   = Color(0xFF4B5563);
+  static const _dotActive  = Color(0xFF7C3AED);
+  static const _dotInact   = Color(0xFFD1D5DB);
 
   @override
   Widget build(BuildContext context) {
@@ -51,7 +48,7 @@ class OnboardingPage1 extends StatelessWidget {
     final bodySize = sw < 380 ? 14.0 : 15.0;
 
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      backgroundColor: _bg,
       body: SafeArea(
         child: Column(
           children: [
@@ -76,7 +73,7 @@ class OnboardingPage1 extends StatelessWidget {
                       style: TextStyle(
                         fontSize: titleSize,
                         fontWeight: FontWeight.w900,
-                        color: Theme.of(context).colorScheme.onSurface,
+                        color: _textDark,
                         height: 1.15,
                         letterSpacing: -0.5,
                       ),
@@ -89,7 +86,7 @@ class OnboardingPage1 extends StatelessWidget {
                       'Browse hundreds of internship opportunities, apply with one tap, upload your CV, and track every application — all in one place.',
                       style: TextStyle(
                         fontSize: bodySize,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        color: _textBody,
                         height: 1.6,
                       ),
                     ),
@@ -103,17 +100,17 @@ class OnboardingPage1 extends StatelessWidget {
                         // Dot indicators
                         Row(
                           children: [
-                            _Dot(active: true,  color: Theme.of(context).colorScheme.primary, inactiveColor: Theme.of(context).colorScheme.outline),
+                            _Dot(active: true,  color: _dotActive, inactiveColor: _dotInact),
                             const SizedBox(width: 8),
-                            _Dot(active: false, color: Theme.of(context).colorScheme.primary, inactiveColor: Theme.of(context).colorScheme.outline),
+                            _Dot(active: false, color: _dotActive, inactiveColor: _dotInact),
                             const SizedBox(width: 8),
-                            _Dot(active: false, color: Theme.of(context).colorScheme.primary, inactiveColor: Theme.of(context).colorScheme.outline),
+                            _Dot(active: false, color: _dotActive, inactiveColor: _dotInact),
                           ],
                         ),
 
                         // Next button
                         _NextButton(
-                          color: Theme.of(context).colorScheme.primary,
+                          color: _accent,
                           onTap: () => Navigator.of(context).push(
                             PageRouteBuilder(
                               pageBuilder: (_, a, _) => const OnboardingPage2(),
