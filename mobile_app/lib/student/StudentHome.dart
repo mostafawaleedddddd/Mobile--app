@@ -1721,58 +1721,75 @@ class AllAnnouncementsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
+    final sw = MediaQuery.of(context).size.width;
+
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      backgroundColor: theme.surface,
       appBar: AppBar(
         title: Text(
           'University Announcements',
           style: TextStyle(
-            color: Theme.of(context).colorScheme.onSurface,
+            color: theme.onSurface,
             fontWeight: FontWeight.bold,
             fontSize: 18,
           ),
         ),
-        backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+        backgroundColor: theme.surfaceContainerHighest,
         elevation: 0,
         centerTitle: true,
         leading: IconButton(
           icon: Icon(
             Icons.arrow_back_ios_new_rounded,
-            color: Theme.of(context).colorScheme.onSurface,
+            color: theme.onSurface,
             size: 20,
           ),
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: StreamBuilder<List<Map<String, dynamic>>>(
-        stream: Supabase.instance.client
-            .from('university_announcements')
-            .stream(primaryKey: ['id'])
-            .order('created_at', ascending: false),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          final liveData = snapshot.data ?? [];
-          if (liveData.isEmpty) {
-            return const Center(child: Text("No announcements found."));
-          }
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: liveData.length,
-            itemBuilder: (context, index) {
-              final item = liveData[index];
-              final a = _Announcement(
-                title: item['title'] ?? 'Untitled',
-                body: item['description'] ?? '',
-                date: _formatTimeAgo(item['created_at']),
-                type: item['type'] ?? 'News',
-                typeColor: _getLiveTypeColor(item['type']),
+      body: Stack(
+        children: [
+          Positioned(
+            top: -80,
+            left: -60,
+            child: _Blob(size: sw * 0.75, color: theme.primary.withOpacity(0.07)),
+          ),
+          Positioned(
+            bottom: -60,
+            right: -40,
+            child: _Blob(size: sw * 0.55, color: theme.primary.withOpacity(0.05)),
+          ),
+          StreamBuilder<List<Map<String, dynamic>>>(
+            stream: Supabase.instance.client
+                .from('university_announcements')
+                .stream(primaryKey: ['id'])
+                .order('created_at', ascending: false),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              final liveData = snapshot.data ?? [];
+              if (liveData.isEmpty) {
+                return const Center(child: Text("No announcements found."));
+              }
+              return ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: liveData.length,
+                itemBuilder: (context, index) {
+                  final item = liveData[index];
+                  final a = _Announcement(
+                    title: item['title'] ?? 'Untitled',
+                    body: item['description'] ?? '',
+                    date: _formatTimeAgo(item['created_at']),
+                    type: item['type'] ?? 'News',
+                    typeColor: _getLiveTypeColor(item['type']),
+                  );
+                  return _AnnouncementCard(a: a);
+                },
               );
-              return _AnnouncementCard(a: a);
             },
-          );
-        },
+          ),
+        ],
       ),
     );
   }
@@ -1852,6 +1869,7 @@ class _AllApplicationsScreenState extends State<AllApplicationsScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context).colorScheme;
+    final sw = MediaQuery.of(context).size.width;
 
     return Scaffold(
       backgroundColor: theme.surface,
@@ -1868,16 +1886,28 @@ class _AllApplicationsScreenState extends State<AllApplicationsScreen> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: theme.primary))
-          : _applications.isEmpty
-          ? Center(child: Text("No applications found.", style: TextStyle(color: theme.onSurfaceVariant)))
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _applications.length,
-              itemBuilder: (context, index) {
-                final app = _applications[index];
-                Color statusCol;
+      body: Stack(
+        children: [
+          Positioned(
+            top: -80,
+            left: -60,
+            child: _Blob(size: sw * 0.75, color: theme.primary.withOpacity(0.07)),
+          ),
+          Positioned(
+            bottom: -60,
+            right: -40,
+            child: _Blob(size: sw * 0.55, color: theme.primary.withOpacity(0.05)),
+          ),
+          _isLoading
+              ? Center(child: CircularProgressIndicator(color: theme.primary))
+              : _applications.isEmpty
+                  ? Center(child: Text("No applications found.", style: TextStyle(color: theme.onSurfaceVariant)))
+                  : ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _applications.length,
+                      itemBuilder: (context, index) {
+                        final app = _applications[index];
+                        Color statusCol;
                 switch (app['status']) {
                   case 'pending': statusCol = const Color(0xFF3B82F6); break;
                   case 'accepted': statusCol = const Color(0xFF10B981); break;
@@ -1939,6 +1969,8 @@ class _AllApplicationsScreenState extends State<AllApplicationsScreen> {
                 );
               },
             ),
+        ],
+      ),    
     );
   }
 }
