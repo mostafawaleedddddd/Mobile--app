@@ -1,8 +1,12 @@
 // import 'dart:typed_data';
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import '../theme_provider.dart';
 import 'Faculty_Session.dart';
 
@@ -30,9 +34,10 @@ class _FacultyHomePageState extends State<FacultyHomePage> {
   void initState() {
     super.initState();
     _pages = [
-      ReviewQueuePage(onGoToProfile: () => setState(() => _currentIndex = 3)),
+      ReviewQueuePage(onGoToProfile: () => setState(() => _currentIndex = 4)),
       PostAnnouncementPage(facultyId: FacultySession.facultyId ?? 0),
       const CompanyManagementPage(),
+      const StudentReportPage(),
       FacultyProfilePage(key: _profileKey),
     ];
   }
@@ -54,7 +59,7 @@ class _FacultyHomePageState extends State<FacultyHomePage> {
           currentIndex: _currentIndex,
           onTap: (index) {
             // Reload stats whenever the Profile tab is opened
-            if (index == 3) {
+            if (index == 4) {
               _profileKey.currentState?._loadStats();
             }
             setState(() => _currentIndex = index);
@@ -83,6 +88,11 @@ class _FacultyHomePageState extends State<FacultyHomePage> {
               icon: Icon(Icons.people_outline_rounded),
               activeIcon: Icon(Icons.people_rounded),
               label: 'Companies',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.school_outlined),
+              activeIcon: Icon(Icons.school_rounded),
+              label: 'Students',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.business_rounded),
@@ -2675,6 +2685,1113 @@ class _FacultyProfilePageState extends State<FacultyProfilePage> {
       ),
     );
   }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// SECTION 5: STUDENT REPORTS
+// ──────────────────────────────────────────────────────────────────────────────
+class StudentReportPage extends StatefulWidget {
+  const StudentReportPage({super.key});
+  @override
+  State<StudentReportPage> createState() => _StudentReportPageState();
+}
+
+class _StudentReportPageState extends State<StudentReportPage> {
+  List<Map<String, dynamic>> _students = [];
+  List<Map<String, dynamic>> _filtered = [];
+  bool _loading = true;
+  final _searchCtrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+    _searchCtrl.addListener(_filter);
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    try {
+      final rows = await _db
+          .from('User_profile')
+          .select('id, name, email')
+          .order('name', ascending: true);
+      final list = List<Map<String, dynamic>>.from(rows as List);
+      if (mounted) {
+        setState(() {
+          _students = list;
+          _filtered = list;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error loading students: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  void _filter() {
+    final q = _searchCtrl.text.toLowerCase();
+    setState(() {
+      _filtered = q.isEmpty
+          ? _students
+          : _students
+              .where((s) =>
+                  (s['name'] ?? '').toString().toLowerCase().contains(q) ||
+                  (s['email'] ?? '').toString().toLowerCase().contains(q))
+              .toList();
+    });
+  }
+
+  String _initials(String name) {
+    final parts = name.trim().split(' ').where((e) => e.isNotEmpty).toList();
+    if (parts.isEmpty) return '?';
+    return parts.take(2).map((e) => e[0].toUpperCase()).join();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
+    return Scaffold(
+      backgroundColor: theme.surface,
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        backgroundColor: theme.surface,
+        elevation: 0,
+        title: Text('Student Reports',
+            style: TextStyle(
+                color: theme.onSurface, fontWeight: FontWeight.bold)),
+        actions: [
+          Consumer<ThemeProvider>(
+            builder: (context, tp, _) => IconButton(
+              onPressed: tp.toggleTheme,
+              icon: Icon(
+                tp.isDarkMode ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+                color: _facultyIndigo,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
+      body: Stack(
+        children: [
+          Positioned(
+            top: -MediaQuery.of(context).size.height * 0.08,
+            left: -MediaQuery.of(context).size.width * 0.2,
+            child: _Blob(
+                size: MediaQuery.of(context).size.width * 0.75,
+                color: _facultyIndigo.withOpacity(0.06)),
+          ),
+          Positioned(
+            bottom: -MediaQuery.of(context).size.height * 0.06,
+            right: -MediaQuery.of(context).size.width * 0.15,
+            child: _Blob(
+                size: MediaQuery.of(context).size.width * 0.6,
+                color: _accentTeal.withOpacity(0.05)),
+          ),
+          Column(
+            children: [
+              // ── Search bar ──────────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                child: TextField(
+                  controller: _searchCtrl,
+                  style: TextStyle(color: theme.onSurface),
+                  decoration: InputDecoration(
+                    hintText: 'Search by name or email…',
+                    hintStyle: TextStyle(color: theme.onSurfaceVariant),
+                    prefixIcon: Icon(Icons.search, color: theme.onSurfaceVariant),
+                    filled: true,
+                    fillColor: theme.surfaceContainerHighest,
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide.none),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                child: Row(
+                  children: [
+                    Text('${_filtered.length} student(s)',
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: theme.onSurfaceVariant,
+                            fontWeight: FontWeight.w500)),
+                  ],
+                ),
+              ),
+              // ── List ────────────────────────────────────────────────────
+              Expanded(
+                child: _loading
+                    ? Center(
+                        child: CircularProgressIndicator(color: theme.primary))
+                    : _filtered.isEmpty
+                        ? Center(
+                            child: Text('No students found.',
+                                style:
+                                    TextStyle(color: theme.onSurfaceVariant)))
+                        : RefreshIndicator(
+                            color: theme.primary,
+                            onRefresh: _load,
+                            child: ListView.builder(
+                              padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                              itemCount: _filtered.length,
+                              itemBuilder: (context, i) {
+                                final s = _filtered[i];
+                                final name =
+                                    (s['name'] ?? 'Unknown').toString();
+                                final email =
+                                    (s['email'] ?? '').toString();
+                                return _StudentCard(
+                                  name: name,
+                                  email: email,
+                                  initials: _initials(name),
+                                  onViewReport: () =>
+                                      _openReport(context, s),
+                                );
+                              },
+                            ),
+                          ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openReport(BuildContext ctx, Map<String, dynamic> student) {
+    showModalBottomSheet(
+      context: ctx,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _StudentReportSheet(student: student),
+    );
+  }
+}
+
+// ── Student card ──────────────────────────────────────────────────────────────
+class _StudentCard extends StatelessWidget {
+  final String name, email, initials;
+  final VoidCallback onViewReport;
+  const _StudentCard({
+    required this.name,
+    required this.email,
+    required this.initials,
+    required this.onViewReport,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
+    return Card(
+      color: theme.surfaceContainerHighest,
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 10),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onViewReport,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF818CF8), _facultyIndigo],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Center(
+                  child: Text(initials,
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15)),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(name,
+                        style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: theme.onSurface)),
+                    const SizedBox(height: 2),
+                    Text(email,
+                        style: TextStyle(
+                            fontSize: 12, color: theme.onSurfaceVariant)),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: _facultyIndigo.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Icon(Icons.description_outlined,
+                        size: 14, color: _facultyIndigo),
+                    SizedBox(width: 4),
+                    Text('Report',
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: _facultyIndigo)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Chip extends StatelessWidget {
+  final String label;
+  final Color color;
+  const _Chip(this.label, this.color);
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(label,
+            style: TextStyle(
+                fontSize: 11, color: color, fontWeight: FontWeight.w600)),
+      );
+}
+
+// ── Full report bottom sheet ──────────────────────────────────────────────────
+class _StudentReportSheet extends StatefulWidget {
+  final Map<String, dynamic> student;
+  const _StudentReportSheet({required this.student});
+  @override
+  State<_StudentReportSheet> createState() => _StudentReportSheetState();
+}
+
+class _StudentReportSheetState extends State<_StudentReportSheet> {
+  List<Map<String, dynamic>> _internships = [];
+  List<Map<String, dynamic>> _certificates = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    final userId = widget.student['id'];
+    try {
+      final results = await Future.wait([
+        // Accepted internship applications with job details
+        _db
+            .from('Job_applications')
+            .select('*, Job_postings(title, company_id, location, duration, Company_profile(name))')
+            .eq('student_id', userId)
+            .eq('status', 'accepted'),
+        // All certificates
+        _db.from('Certificates').select().eq('user_id', userId).order('date', ascending: false),
+      ]);
+      if (mounted) {
+        setState(() {
+          _internships = List<Map<String, dynamic>>.from(results[0] as List);
+          _certificates = List<Map<String, dynamic>>.from(results[1] as List);
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error loading data: $e')));
+      }
+    }
+  }
+
+  String _fmt(String? iso) {
+    if (iso == null || iso.isEmpty) return '—';
+    try {
+      final dt = DateTime.parse(iso);
+      return '${dt.day}/${dt.month}/${dt.year}';
+    } catch (_) {
+      return iso;
+    }
+  }
+
+  Future<void> _printReport() async {
+    final student = widget.student;
+    final name = (student['name'] ?? 'Unknown').toString();
+    final email = (student['email'] ?? '').toString();
+
+    final pdf = pw.Document();
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(40),
+        header: (pw.Context ctx) => pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text('Student Internship Report',
+                        style: pw.TextStyle(
+                            fontSize: 22, fontWeight: pw.FontWeight.bold)),
+                    pw.SizedBox(height: 4),
+                    pw.Text('Generated: ${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}',
+                        style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey600)),
+                  ],
+                ),
+                pw.Container(
+                  padding: const pw.EdgeInsets.all(10),
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(color: PdfColors.indigo, width: 1.5),
+                    borderRadius: pw.BorderRadius.circular(8),
+                  ),
+                  child: pw.Text('OFFICIAL RECORD',
+                      style: pw.TextStyle(
+                          fontSize: 9,
+                          fontWeight: pw.FontWeight.bold,
+                          color: PdfColors.indigo)),
+                ),
+              ],
+            ),
+            pw.Divider(color: PdfColors.indigo, thickness: 2),
+            pw.SizedBox(height: 4),
+          ],
+        ),
+        build: (pw.Context ctx) => [
+          // ── Student Info ──────────────────────────────────────────────
+          pw.Container(
+            padding: const pw.EdgeInsets.all(16),
+            decoration: pw.BoxDecoration(
+              color: PdfColors.indigo50,
+              borderRadius: pw.BorderRadius.circular(10),
+            ),
+            child: pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text(name,
+                        style: pw.TextStyle(
+                            fontSize: 18, fontWeight: pw.FontWeight.bold)),
+                    pw.SizedBox(height: 6),
+                    if (email.isNotEmpty)
+                      _pdfRow(Icons.email, 'Email', email),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          pw.SizedBox(height: 20),
+
+          // ── Internship History ────────────────────────────────────────
+          pw.Text('Internship History',
+              style: pw.TextStyle(
+                  fontSize: 15,
+                  fontWeight: pw.FontWeight.bold,
+                  color: PdfColors.indigo800)),
+          pw.SizedBox(height: 2),
+          pw.Divider(color: PdfColors.indigo200),
+          pw.SizedBox(height: 8),
+          if (_internships.isEmpty)
+            pw.Container(
+              padding: const pw.EdgeInsets.all(12),
+              decoration: pw.BoxDecoration(
+                color: PdfColors.grey100,
+                borderRadius: pw.BorderRadius.circular(8),
+              ),
+              child: pw.Text('No accepted internships on record.',
+                  style: const pw.TextStyle(color: PdfColors.grey600)),
+            )
+          else
+            ..._internships.map((app) {
+              final job = app['Job_postings'] as Map<String, dynamic>?;
+              final company = job?['Company_profile'] as Map<String, dynamic>?;
+              final jobTitle = (job?['title'] ?? 'Unknown Role').toString();
+              final companyName = (company?['name'] ?? 'Unknown Company').toString();
+              final location = (job?['location'] ?? '').toString();
+              final duration = (job?['duration'] ?? '').toString();
+              final appliedAt = _fmt(app['applied_at']?.toString());
+
+              return pw.Container(
+                margin: const pw.EdgeInsets.only(bottom: 10),
+                padding: const pw.EdgeInsets.all(14),
+                decoration: pw.BoxDecoration(
+                  border: pw.Border.all(color: PdfColors.indigo200),
+                  borderRadius: pw.BorderRadius.circular(8),
+                ),
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Row(
+                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                      children: [
+                        pw.Text(jobTitle,
+                            style: pw.TextStyle(
+                                fontSize: 13, fontWeight: pw.FontWeight.bold)),
+                        pw.Container(
+                          padding: const pw.EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: pw.BoxDecoration(
+                            color: PdfColors.teal50,
+                            borderRadius: pw.BorderRadius.circular(4),
+                          ),
+                          child: pw.Text('Accepted',
+                              style: const pw.TextStyle(
+                                  fontSize: 9, color: PdfColors.teal800)),
+                        ),
+                      ],
+                    ),
+                    pw.SizedBox(height: 6),
+                    _pdfRow(Icons.business, 'Company', companyName),
+                    if (location.isNotEmpty)
+                      _pdfRow(Icons.location_on, 'Location', location),
+                    if (duration.isNotEmpty)
+                      _pdfRow(Icons.access_time, 'Duration', duration),
+                    _pdfRow(Icons.event, 'Applied On', appliedAt),
+                  ],
+                ),
+              );
+            }),
+          pw.SizedBox(height: 20),
+
+          // ── Certificates ──────────────────────────────────────────────
+          pw.Text('Certificates & Achievements',
+              style: pw.TextStyle(
+                  fontSize: 15,
+                  fontWeight: pw.FontWeight.bold,
+                  color: PdfColors.indigo800)),
+          pw.SizedBox(height: 2),
+          pw.Divider(color: PdfColors.indigo200),
+          pw.SizedBox(height: 8),
+          if (_certificates.isEmpty)
+            pw.Container(
+              padding: const pw.EdgeInsets.all(12),
+              decoration: pw.BoxDecoration(
+                color: PdfColors.grey100,
+                borderRadius: pw.BorderRadius.circular(8),
+              ),
+              child: pw.Text('No certificates on record.',
+                  style: const pw.TextStyle(color: PdfColors.grey600)),
+            )
+          else
+            ..._certificates.asMap().entries.map((entry) {
+              final i = entry.key;
+              final cert = entry.value;
+              final title = (cert['title'] ?? 'Untitled').toString();
+              final desc = (cert['description'] ?? '').toString();
+              final date = _fmt(cert['date']?.toString());
+              final isVerified = cert['is_verified'] == true;
+
+              return pw.Container(
+                margin: const pw.EdgeInsets.only(bottom: 10),
+                padding: const pw.EdgeInsets.all(14),
+                decoration: pw.BoxDecoration(
+                  border: pw.Border.all(
+                      color: isVerified
+                          ? PdfColors.teal200
+                          : PdfColors.orange200),
+                  borderRadius: pw.BorderRadius.circular(8),
+                ),
+                child: pw.Row(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Container(
+                      width: 28,
+                      height: 28,
+                      decoration: pw.BoxDecoration(
+                        color: isVerified ? PdfColors.teal100 : PdfColors.orange100,
+                        shape: pw.BoxShape.circle,
+                      ),
+                      child: pw.Center(
+                        child: pw.Text('${i + 1}',
+                            style: pw.TextStyle(
+                                fontSize: 12,
+                                fontWeight: pw.FontWeight.bold,
+                                color: isVerified
+                                    ? PdfColors.teal800
+                                    : PdfColors.orange800)),
+                      ),
+                    ),
+                    pw.SizedBox(width: 12),
+                    pw.Expanded(
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Row(
+                            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                            children: [
+                              pw.Text(title,
+                                  style: pw.TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: pw.FontWeight.bold)),
+                              pw.Container(
+                                padding: const pw.EdgeInsets.symmetric(
+                                    horizontal: 7, vertical: 2),
+                                decoration: pw.BoxDecoration(
+                                  color: isVerified
+                                      ? PdfColors.teal50
+                                      : PdfColors.orange50,
+                                  borderRadius: pw.BorderRadius.circular(4),
+                                ),
+                                child: pw.Text(
+                                    isVerified ? '✓ Verified' : 'Pending',
+                                    style: pw.TextStyle(
+                                        fontSize: 9,
+                                        color: isVerified
+                                            ? PdfColors.teal800
+                                            : PdfColors.orange800)),
+                              ),
+                            ],
+                          ),
+                          if (desc.isNotEmpty) ...[
+                            pw.SizedBox(height: 4),
+                            pw.Text(desc,
+                                style: const pw.TextStyle(
+                                    fontSize: 11, color: PdfColors.grey700)),
+                          ],
+                          pw.SizedBox(height: 4),
+                          _pdfRow(Icons.calendar_today, 'Date', date),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+        ],
+      ),
+    );
+
+    final bytes = await pdf.save();
+    await Printing.sharePdf(
+      bytes: bytes,
+      filename: 'report_$name.pdf',
+    );
+  }
+
+  pw.Widget _pdfRow(IconData _, String label, String value) => pw.Padding(
+        padding: const pw.EdgeInsets.only(top: 3),
+        child: pw.Row(
+          children: [
+            pw.Text('$label: ',
+                style: pw.TextStyle(
+                    fontSize: 11,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColors.grey700)),
+            pw.Text(value,
+                style: const pw.TextStyle(
+                    fontSize: 11, color: PdfColors.grey800)),
+          ],
+        ),
+      );
+
+  // ── In-app report preview ─────────────────────────────────────────────────
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
+    final student = widget.student;
+    final name = (student['name'] ?? 'Unknown').toString();
+    final email = (student['email'] ?? '').toString();
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.92,
+      minChildSize: 0.5,
+      maxChildSize: 1.0,
+      expand: false,
+      builder: (_, scrollCtrl) => Container(
+        decoration: BoxDecoration(
+          color: theme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          children: [
+            // ── Sheet handle + header ──────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+              child: Column(
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                          color: theme.outline,
+                          borderRadius: BorderRadius.circular(2)),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Student Report',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    color: theme.onSurfaceVariant,
+                                    fontWeight: FontWeight.w500)),
+                            Text(name,
+                                style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: theme.onSurface)),
+                          ],
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed: _loading ? null : _printReport,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _facultyIndigo,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 10),
+                        ),
+                        icon: const Icon(Icons.download_rounded, size: 18),
+                        label: const Text('Download',
+                            style: TextStyle(fontWeight: FontWeight.w700)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Divider(color: theme.outlineVariant),
+                ],
+              ),
+            ),
+
+            // ── Scrollable content ─────────────────────────────────────
+            Expanded(
+              child: _loading
+                  ? Center(
+                      child: CircularProgressIndicator(color: theme.primary))
+                  : ListView(
+                      controller: scrollCtrl,
+                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+                      children: [
+                        // Student info card
+                        _ReportSection(
+                          icon: Icons.person_outline_rounded,
+                          title: 'Student Information',
+                          color: _facultyIndigo,
+                          child: Column(
+                            children: [
+                              _ReportRow(Icons.email_outlined, 'Email', email.isEmpty ? '—' : email),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Internship history
+                        _ReportSection(
+                          icon: Icons.work_history_outlined,
+                          title: 'Internship History',
+                          subtitle: '${_internships.length} accepted internship(s)',
+                          color: _accentTeal,
+                          child: _internships.isEmpty
+                              ? _EmptyHint('No accepted internships on record.')
+                              : Column(
+                                  children: _internships.map((app) {
+                                    final job = app['Job_postings'] as Map<String, dynamic>?;
+                                    final company = job?['Company_profile'] as Map<String, dynamic>?;
+                                    final jobTitle = (job?['title'] ?? 'Unknown Role').toString();
+                                    final companyName = (company?['name'] ?? 'Unknown Company').toString();
+                                    final location = (job?['location'] ?? '').toString();
+                                    final duration = (job?['duration'] ?? '').toString();
+                                    final appliedAt = _fmt(app['applied_at']?.toString());
+                                    return _InternshipTile(
+                                      jobTitle: jobTitle,
+                                      companyName: companyName,
+                                      location: location,
+                                      duration: duration,
+                                      appliedAt: appliedAt,
+                                    );
+                                  }).toList(),
+                                ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Certificates
+                        _ReportSection(
+                          icon: Icons.workspace_premium_outlined,
+                          title: 'Certificates & Achievements',
+                          subtitle: '${_certificates.length} certificate(s)',
+                          color: const Color(0xFFD97706),
+                          child: _certificates.isEmpty
+                              ? _EmptyHint('No certificates uploaded.')
+                              : Column(
+                                  children: _certificates
+                                      .map((c) => _CertTile(cert: c, fmt: _fmt))
+                                      .toList(),
+                                ),
+                        ),
+                      ],
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Reusable report UI widgets ────────────────────────────────────────────────
+class _ReportSection extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final Color color;
+  final Widget child;
+  const _ReportSection({
+    required this.icon,
+    required this.title,
+    this.subtitle,
+    required this.color,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, color: color, size: 18),
+                ),
+                const SizedBox(width: 10),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
+                        style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: theme.onSurface)),
+                    if (subtitle != null)
+                      Text(subtitle!,
+                          style: TextStyle(
+                              fontSize: 11, color: theme.onSurfaceVariant)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Divider(height: 1, color: color.withOpacity(0.15)),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: child,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReportRow extends StatelessWidget {
+  final IconData icon;
+  final String label, value;
+  const _ReportRow(this.icon, this.label, this.value);
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: _facultyIndigo),
+          const SizedBox(width: 8),
+          Text('$label:  ',
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: theme.onSurfaceVariant)),
+          Expanded(
+            child: Text(value,
+                style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: theme.onSurface),
+                textAlign: TextAlign.end),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InternshipTile extends StatelessWidget {
+  final String jobTitle, companyName, location, duration, appliedAt;
+  const _InternshipTile({
+    required this.jobTitle,
+    required this.companyName,
+    required this.location,
+    required this.duration,
+    required this.appliedAt,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _accentTeal.withOpacity(0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(jobTitle,
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: theme.onSurface)),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: _accentTeal.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text('Accepted',
+                    style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: _accentTeal)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          _IRow(Icons.business_outlined, companyName),
+          if (location.isNotEmpty) _IRow(Icons.location_on_outlined, location),
+          if (duration.isNotEmpty) _IRow(Icons.access_time_rounded, duration),
+          _IRow(Icons.event_outlined, 'Applied: $appliedAt'),
+        ],
+      ),
+    );
+  }
+}
+
+class _IRow extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  const _IRow(this.icon, this.text);
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 13, color: theme.onSurfaceVariant),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(text,
+                style: TextStyle(
+                    fontSize: 12, color: theme.onSurfaceVariant)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CertTile extends StatelessWidget {
+  final Map<String, dynamic> cert;
+  final String Function(String?) fmt;
+  const _CertTile({required this.cert, required this.fmt});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
+    final title = (cert['title'] ?? 'Untitled').toString();
+    final desc = (cert['description'] ?? '').toString();
+    final date = fmt(cert['date']?.toString());
+    final isVerified = cert['is_verified'] == true;
+    final imageUrl = (cert['image_url'] ?? '').toString();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: theme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+            color: isVerified
+                ? Colors.green.withOpacity(0.3)
+                : Colors.orange.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: isVerified
+                        ? Colors.green.withOpacity(0.1)
+                        : Colors.orange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    isVerified
+                        ? Icons.verified_rounded
+                        : Icons.pending_outlined,
+                    size: 16,
+                    color: isVerified ? Colors.green : Colors.orange,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title,
+                          style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: theme.onSurface)),
+                      if (desc.isNotEmpty)
+                        Text(desc,
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: theme.onSurfaceVariant)),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: isVerified
+                        ? Colors.green.withOpacity(0.1)
+                        : Colors.orange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    isVerified ? '✓ Verified' : 'Pending',
+                    style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: isVerified ? Colors.green : Colors.orange),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            child: Row(
+              children: [
+                Icon(Icons.calendar_today_outlined,
+                    size: 12, color: theme.onSurfaceVariant),
+                const SizedBox(width: 4),
+                Text(date,
+                    style: TextStyle(
+                        fontSize: 11, color: theme.onSurfaceVariant)),
+              ],
+            ),
+          ),
+          // Certificate image thumbnail
+          if (imageUrl.isNotEmpty)
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(12)),
+              child: _buildCertImage(imageUrl),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCertImage(String url) {
+    if (url.startsWith('data:image')) {
+      try {
+        final bytes = base64Decode(url.split(',').last);
+        return Image.memory(bytes,
+            height: 160, width: double.infinity, fit: BoxFit.cover);
+      } catch (_) {
+        return const SizedBox.shrink();
+      }
+    }
+    return Image.network(url,
+        height: 160, width: double.infinity, fit: BoxFit.cover);
+  }
+}
+
+class _EmptyHint extends StatelessWidget {
+  final String message;
+  const _EmptyHint(this.message);
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Text(message,
+            style: TextStyle(
+                fontSize: 13,
+                color: Theme.of(context).colorScheme.onSurfaceVariant)),
+      );
 }
 
 // ──────────────────────────────────────────────────────────────────────────────

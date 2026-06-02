@@ -276,7 +276,10 @@ class _CompanyHomePageState extends State<CompanyHomePage> {
       ),
       _ProfileTab(
         company: _company,
+        jobs: _jobs,
+        applications: _applications,
         onLogout: () => Navigator.of(context).pop(),
+        onRefresh: _loadData,
       ),
     ];
 
@@ -2829,130 +2832,888 @@ class _EmptyField extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 // TAB 4 — PROFILE
 // ─────────────────────────────────────────────────────────────────────────────
-class _ProfileTab extends StatelessWidget {
+class _ProfileTab extends StatefulWidget {
   final CompanyProfile? company;
+  final List<JobPosting> jobs;
+  final List<JobApplication> applications;
   final VoidCallback onLogout;
-  const _ProfileTab({required this.company, required this.onLogout});
+  final VoidCallback onRefresh;
+  const _ProfileTab({
+    required this.company,
+    required this.jobs,
+    required this.applications,
+    required this.onLogout,
+    required this.onRefresh,
+  });
+  @override
+  State<_ProfileTab> createState() => _ProfileTabState();
+}
+
+class _ProfileTabState extends State<_ProfileTab> {
+  // ── Edit Profile ───────────────────────────────────────────────────────────
+  Future<void> _editProfile() async {
+    final c = widget.company;
+    if (c == null) return;
+
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _EditProfileSheet(company: c),
+    );
+
+    if (saved == true && mounted) {
+      widget.onRefresh();
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: const Text('Profile updated!', style: TextStyle(fontWeight: FontWeight.w600)),
+        backgroundColor: _teal,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+      ));
+    }
+  }
+
+  // ── Delete a job posting ───────────────────────────────────────────────────
+  Future<void> _deleteJob(JobPosting job) async {
+    final theme = Theme.of(context).colorScheme;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: theme.surfaceContainerHighest,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text('Delete Job Posting', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+        content: Text(
+          'Are you sure you want to delete "${job.title}"? This will also remove all its applications.',
+          style: TextStyle(color: theme.onSurfaceVariant, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Cancel', style: TextStyle(color: theme.onSurfaceVariant)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _rejectColor,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Delete', style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      try {
+        await Supabase.instance.client
+            .from('Job_applications')
+            .delete()
+            .eq('job_id', job.id!);
+        await Supabase.instance.client
+            .from('Job_postings')
+            .delete()
+            .eq('id', job.id!);
+        if (mounted) {
+          widget.onRefresh();
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('"${job.title}" deleted.'),
+            backgroundColor: _rejectColor,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            margin: const EdgeInsets.all(16),
+          ));
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        }
+      }
+    }
+  }
+
+  // ── Change Password ────────────────────────────────────────────────────────
+  Future<void> _changePassword() async {
+    final theme = Theme.of(context).colorScheme;
+    final ctrl = TextEditingController();
+    bool obscure = true;
+
+    await showDialog(
+      context: context,
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setSt) => AlertDialog(
+          backgroundColor: theme.surfaceContainerHighest,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          title: const Text('Change Password', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+          content: TextField(
+            controller: ctrl,
+            obscureText: obscure,
+            style: TextStyle(color: theme.onSurface),
+            decoration: InputDecoration(
+              hintText: 'New password',
+              hintStyle: TextStyle(color: theme.onSurfaceVariant.withOpacity(0.6)),
+              filled: true,
+              fillColor: theme.surface,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: theme.outline),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: _teal, width: 1.8),
+              ),
+              suffixIcon: IconButton(
+                icon: Icon(obscure ? Icons.visibility_off : Icons.visibility, color: theme.onSurfaceVariant),
+                onPressed: () => setSt(() => obscure = !obscure),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text('Cancel', style: TextStyle(color: theme.onSurfaceVariant)),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (ctrl.text.trim().length < 6) return;
+                try {
+                  await Supabase.instance.client.auth.updateUser(
+                    UserAttributes(password: ctrl.text.trim()),
+                  );
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: const Text('Password updated!', style: TextStyle(fontWeight: FontWeight.w600)),
+                      backgroundColor: _acceptColor,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      margin: const EdgeInsets.all(16),
+                    ));
+                  }
+                } catch (e) {
+                  if (ctx.mounted) Navigator.pop(ctx);
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _teal,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: const Text('Update', style: TextStyle(fontWeight: FontWeight.w700)),
+            ),
+          ],
+        ),
+      ),
+    );
+    ctrl.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final c = company;
+    final c = widget.company;
     final theme = Theme.of(context).colorScheme;
+    final apps = widget.applications;
+    final jobs = widget.jobs;
+
+    final totalApps = apps.length;
+    final accepted = apps.where((a) => a.status == 'accepted').length;
+    final pending = apps.where((a) => a.status == 'pending').length;
+    final interviews = apps.where((a) => a.status == 'interview').length;
 
     return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        child: Column(
-          children: [
-            const SizedBox(height: 16),
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [_teal, _tealDark],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: _teal.withOpacity(0.35),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Center(
-                child: Text(
-                  c?.initials ?? 'C',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 28,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              c?.name ?? 'Company',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-                color: theme.onSurface,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              c?.email ?? '',
-              style: TextStyle(fontSize: 14, color: theme.onSurfaceVariant),
-            ),
-            const SizedBox(height: 28),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              decoration: BoxDecoration(
-                color: theme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(18),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 14,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
+      child: RefreshIndicator(
+        color: _teal,
+        onRefresh: () async => widget.onRefresh(),
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Header ────────────────────────────────────────────────────
+              const SizedBox(height: 8),
+              Row(
                 children: [
-                  _PRow(
-                    Icons.category_outlined,
-                    'Industry',
-                    c?.industry ?? '—',
+                  const Spacer(),
+                  IconButton(
+                    onPressed: _editProfile,
+                    icon: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: _teal.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.edit_rounded, color: _teal, size: 18),
+                    ),
+                    tooltip: 'Edit Profile',
                   ),
-                  Divider(height: 1, color: theme.outline),
-                  _PRow(
-                    Icons.location_on_outlined,
-                    'Location',
-                    c?.location ?? '—',
-                  ),
-                  Divider(height: 1, color: theme.outline),
-                  _PRow(Icons.email_outlined, 'Email', c?.email ?? '—'),
-                  if (c?.description != null && c!.description!.isNotEmpty) ...[
-                    Divider(height: 1, color: theme.outline),
-                    _PRow(Icons.description_outlined, 'About', c.description!),
+                ],
+              ),
+              // ── Avatar + name ─────────────────────────────────────────────
+              Center(
+                child: Column(
+                  children: [
+                    Stack(
+                      children: [
+                        Container(
+                          width: 90,
+                          height: 90,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [_teal, _tealDark],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(28),
+                            boxShadow: [
+                              BoxShadow(
+                                color: _teal.withOpacity(0.40),
+                                blurRadius: 24,
+                                offset: const Offset(0, 10),
+                              ),
+                            ],
+                          ),
+                          child: Center(
+                            child: Text(
+                              c?.initials ?? 'C',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 32,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: GestureDetector(
+                            onTap: _editProfile,
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: _teal,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: theme.surface, width: 2),
+                              ),
+                              child: const Icon(Icons.edit_rounded, size: 12, color: Colors.white),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      c?.name ?? 'Company',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: theme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.location_on_rounded, size: 13, color: theme.onSurfaceVariant),
+                        const SizedBox(width: 3),
+                        Text(
+                          c?.location ?? 'Location not set',
+                          style: TextStyle(fontSize: 13, color: theme.onSurfaceVariant),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(width: 3, height: 3, decoration: BoxDecoration(color: theme.onSurfaceVariant, shape: BoxShape.circle)),
+                        const SizedBox(width: 8),
+                        Text(
+                          c?.industry ?? 'Industry not set',
+                          style: TextStyle(fontSize: 13, color: theme.onSurfaceVariant),
+                        ),
+                      ],
+                    ),
                   ],
+                ),
+              ),
+
+              // ── Hiring Stats Bar ──────────────────────────────────────────
+              const SizedBox(height: 28),
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [_teal, _tealDark],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _teal.withOpacity(0.30),
+                      blurRadius: 18,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _MiniStat('${jobs.length}', 'Jobs Posted'),
+                    _Divider(),
+                    _MiniStat('$totalApps', 'Total Applicants'),
+                    _Divider(),
+                    _MiniStat('$accepted', 'Hired'),
+                    _Divider(),
+                    _MiniStat('$interviews', 'Interviews'),
+                  ],
+                ),
+              ),
+
+              // ── Company Info ──────────────────────────────────────────────
+              const SizedBox(height: 24),
+              _SectionHeader('Company Info', Icons.business_rounded),
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                decoration: BoxDecoration(
+                  color: theme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 14,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    _PRow(Icons.category_outlined, 'Industry', c?.industry ?? '—'),
+                    Divider(height: 1, color: theme.outline),
+                    _PRow(Icons.location_on_outlined, 'Location', c?.location ?? '—'),
+                    Divider(height: 1, color: theme.outline),
+                    _PRow(Icons.email_outlined, 'Email', c?.email ?? '—'),
+                    if (c?.description != null && c!.description!.isNotEmpty) ...[
+                      Divider(height: 1, color: theme.outline),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.description_outlined, size: 18, color: _teal),
+                                const SizedBox(width: 12),
+                                Text(
+                                  'About',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: theme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              c.description!,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: theme.onSurface,
+                                height: 1.55,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+
+              // ── Application Breakdown ─────────────────────────────────────
+              if (totalApps > 0) ...[
+                const SizedBox(height: 24),
+                _SectionHeader('Application Breakdown', Icons.bar_chart_rounded),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: theme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(18),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 14,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      _BarRow('Pending', pending, totalApps, _pendingColor),
+                      const SizedBox(height: 10),
+                      _BarRow('Accepted', accepted, totalApps, _acceptColor),
+                      const SizedBox(height: 10),
+                      _BarRow('Interview', interviews, totalApps, _interviewColor),
+                      const SizedBox(height: 10),
+                      _BarRow(
+                        'Rejected',
+                        apps.where((a) => a.status == 'rejected').length,
+                        totalApps,
+                        _rejectColor,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
+              // ── Active Job Postings ───────────────────────────────────────
+              if (jobs.isNotEmpty) ...[
+                const SizedBox(height: 24),
+                _SectionHeader('Your Job Postings', Icons.work_outline_rounded),
+                const SizedBox(height: 12),
+                ...jobs.map((job) {
+                  final jobApps = apps.where((a) => a.jobId == job.id).length;
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: theme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.04),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            color: _teal.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.work_outline_rounded, color: _teal, size: 20),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                job.title,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: theme.onSurface,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${job.location ?? 'Remote'} · ${job.duration ?? '—'}',
+                                style: TextStyle(fontSize: 12, color: theme.onSurfaceVariant),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: _teal.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                '$jobApps applicants',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: _teal,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            GestureDetector(
+                              onTap: () => _deleteJob(job),
+                              child: const Icon(Icons.delete_outline_rounded, color: _rejectColor, size: 18),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+
+              // ── Quick Actions ─────────────────────────────────────────────
+              // ── Account Section ─────────────────────────────────────────────
+const SizedBox(height: 24),
+_SectionHeader('Account', Icons.manage_accounts_rounded),
+const SizedBox(height: 12),
+
+Container(
+  decoration: BoxDecoration(
+    color: theme.surfaceContainerHighest,
+    borderRadius: BorderRadius.circular(18),
+    boxShadow: [
+      BoxShadow(
+        color: Colors.black.withOpacity(0.05),
+        blurRadius: 14,
+        offset: const Offset(0, 4),
+      ),
+    ],
+  ),
+  child: Column(
+    children: [
+      _ActionRow(
+        icon: Icons.edit_rounded,
+        color: _teal,
+        label: 'Edit Profile',
+        subtitle: 'Update your company details',
+        onTap: _editProfile,
+      ),
+    ],
+  ),
+),
+
+              // ── Logout ────────────────────────────────────────────────────
+              const SizedBox(height: 28),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: OutlinedButton.icon(
+                  onPressed: widget.onLogout,
+                  icon: const Icon(Icons.logout_rounded, size: 18, color: _rejectColor),
+                  label: const Text(
+                    'Logout',
+                    style: TextStyle(color: _rejectColor, fontWeight: FontWeight.w700, fontSize: 15),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: _rejectColor, width: 1.4),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 28),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Profile Tab Helpers ───────────────────────────────────────────────────────
+
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  const _SectionHeader(this.title, this.icon);
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        Container(
+          width: 30,
+          height: 30,
+          decoration: BoxDecoration(
+            color: _teal.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(9),
+          ),
+          child: Icon(icon, size: 15, color: _teal),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            color: theme.onSurface,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MiniStat extends StatelessWidget {
+  final String value, label;
+  const _MiniStat(this.value, this.label);
+  @override
+  Widget build(BuildContext context) => Column(
+    children: [
+      Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.white)),
+      const SizedBox(height: 2),
+      Text(label, style: const TextStyle(fontSize: 10, color: Colors.white70, fontWeight: FontWeight.w500)),
+    ],
+  );
+}
+
+class _Divider extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 1, height: 32,
+    color: Colors.white.withOpacity(0.25),
+  );
+}
+
+class _BarRow extends StatelessWidget {
+  final String label;
+  final int count, total;
+  final Color color;
+  const _BarRow(this.label, this.count, this.total, this.color);
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
+    final pct = total == 0 ? 0.0 : count / total;
+    return Row(
+      children: [
+        SizedBox(
+          width: 72,
+          child: Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: theme.onSurfaceVariant)),
+        ),
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: LinearProgressIndicator(
+              value: pct,
+              minHeight: 8,
+              backgroundColor: theme.outline.withOpacity(0.3),
+              valueColor: AlwaysStoppedAnimation<Color>(color),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          '$count',
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color),
+        ),
+      ],
+    );
+  }
+}
+
+class _ActionRow extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String label, subtitle;
+  final VoidCallback onTap;
+  const _ActionRow({
+    required this.icon,
+    required this.color,
+    required this.label,
+    required this.subtitle,
+    required this.onTap,
+  });
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, size: 18, color: color),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: theme.onSurface)),
+                  Text(subtitle, style: TextStyle(fontSize: 12, color: theme.onSurfaceVariant)),
                 ],
               ),
             ),
-            const SizedBox(height: 28),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: OutlinedButton.icon(
-                onPressed: onLogout,
-                icon: const Icon(
-                  Icons.logout_rounded,
-                  size: 18,
-                  color: _rejectColor,
-                ),
-                label: const Text(
-                  'Logout',
-                  style: TextStyle(
-                    color: _rejectColor,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 15,
-                  ),
-                ),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: _rejectColor, width: 1.4),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+            Icon(Icons.chevron_right_rounded, color: theme.onSurfaceVariant, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EDIT PROFILE SHEET  (owns its own controllers so disposal is safe)
+// ─────────────────────────────────────────────────────────────────────────────
+class _EditProfileSheet extends StatefulWidget {
+  final CompanyProfile company;
+  const _EditProfileSheet({required this.company});
+  @override
+  State<_EditProfileSheet> createState() => _EditProfileSheetState();
+}
+
+class _EditProfileSheetState extends State<_EditProfileSheet> {
+  late final TextEditingController _nameCtrl;
+  late final TextEditingController _industryCtrl;
+  late final TextEditingController _locationCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameCtrl     = TextEditingController(text: widget.company.name);
+    _industryCtrl = TextEditingController(text: widget.company.industry ?? '');
+    _locationCtrl = TextEditingController(text: widget.company.location ?? '');
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _industryCtrl.dispose();
+    _locationCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Container(
+        decoration: BoxDecoration(
+          color: theme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: theme.outline,
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
-          ],
+              const SizedBox(height: 16),
+              Text(
+                'Edit Company Profile',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: theme.onSurface,
+                ),
+              ),
+              const SizedBox(height: 20),
+              _EditField(ctrl: _nameCtrl,     label: 'Company Name', icon: Icons.business_rounded),
+              const SizedBox(height: 12),
+              _EditField(ctrl: _industryCtrl, label: 'Industry',     icon: Icons.category_outlined),
+              const SizedBox(height: 12),
+              _EditField(ctrl: _locationCtrl, label: 'Location',     icon: Icons.location_on_outlined),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: theme.outline),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      child: Text('Cancel', style: TextStyle(color: theme.onSurfaceVariant, fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        try {
+                          await Supabase.instance.client
+                              .from('Company_profile')
+                              .update({
+                                'name':     _nameCtrl.text.trim(),
+                                'industry': _industryCtrl.text.trim(),
+                                'location': _locationCtrl.text.trim(),
+                              })
+                              .eq('id', widget.company.id);
+                          if (mounted) Navigator.pop(context, true);
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Failed to save: $e'),
+                                backgroundColor: _rejectColor,
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                margin: const EdgeInsets.all(16),
+                              ),
+                            );
+                          }
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _teal,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      child: const Text('Save Changes', style: TextStyle(fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EditField extends StatelessWidget {
+  final TextEditingController ctrl;
+  final String label;
+  final IconData icon;
+  final int maxLines;
+  const _EditField({required this.ctrl, required this.label, required this.icon, this.maxLines = 1});
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
+    return TextField(
+      controller: ctrl,
+      maxLines: maxLines,
+      style: TextStyle(color: theme.onSurface, fontSize: 14),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: TextStyle(color: theme.onSurfaceVariant, fontSize: 13),
+        prefixIcon: Icon(icon, color: _teal, size: 18),
+        filled: true,
+        fillColor: theme.surfaceContainerHighest,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: theme.outline),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: theme.outline),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: _teal, width: 1.8),
         ),
       ),
     );
