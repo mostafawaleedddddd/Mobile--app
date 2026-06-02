@@ -1699,8 +1699,9 @@ String _formatTimeAgo(String? timestamp) {
   DateTime now = DateTime.now();
   Duration diff = now.difference(postDate);
   if (diff.isNegative || diff.inSeconds < 60) return "Just now";
-  if (diff.inMinutes < 60) return "${diff.inMinutes} mins ago";
-  else if (diff.inHours < 24) return "${diff.inHours} hours ago";
+  if (diff.inMinutes < 60) {
+    return "${diff.inMinutes} mins ago";
+  } else if (diff.inHours < 24) return "${diff.inHours} hours ago";
   else if (diff.inDays < 7) return "${diff.inDays} days ago";
   else return "${postDate.day}/${postDate.month}/${postDate.year}";
 }

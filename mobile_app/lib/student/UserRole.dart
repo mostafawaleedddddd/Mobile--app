@@ -111,8 +111,8 @@ class _UserRoleState extends State<UserRole> with TickerProviderStateMixin {
       Navigator.push(
         context,
         PageRouteBuilder(
-          pageBuilder: (_, a, __) => const AuthScreen(),
-          transitionsBuilder: (_, anim, __, child) => FadeTransition(
+          pageBuilder: (_, a, _) => const AuthScreen(),
+          transitionsBuilder: (_, anim, _, child) => FadeTransition(
             opacity: anim,
             child: SlideTransition(
               position:
@@ -132,8 +132,8 @@ class _UserRoleState extends State<UserRole> with TickerProviderStateMixin {
       Navigator.push(
         context,
         PageRouteBuilder(
-          pageBuilder: (_, a, __) => const CompanyAuthScreen(),
-          transitionsBuilder: (_, anim, __, child) =>
+          pageBuilder: (_, a, _) => const CompanyAuthScreen(),
+          transitionsBuilder: (_, anim, _, child) =>
               FadeTransition(opacity: anim, child: child),
           transitionDuration: const Duration(milliseconds: 420),
         ),
@@ -142,8 +142,8 @@ class _UserRoleState extends State<UserRole> with TickerProviderStateMixin {
      Navigator.push(
     context,
     PageRouteBuilder(
-      pageBuilder: (_, a, __) => const FacultyAuthScreen(),
-      transitionsBuilder: (_, anim, __, child) =>
+      pageBuilder: (_, a, _) => const FacultyAuthScreen(),
+      transitionsBuilder: (_, anim, _, child) =>
           FadeTransition(opacity: anim, child: child),
       transitionDuration: const Duration(milliseconds: 420),
     ),
@@ -344,7 +344,7 @@ class _FloatingLogo extends StatelessWidget {
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: Listenable.merge([pulseCtrl, floatCtrl]),
-      builder: (_, __) {
+      builder: (_, _) {
         final floatY = math.sin(floatCtrl.value * math.pi) * 6.0;
         final glowR = 42.0 + pulseCtrl.value * 8;
         final glowOp = 0.13 + pulseCtrl.value * 0.12;
@@ -425,7 +425,7 @@ class _AnimatedBlob extends StatelessWidget {
       right: right,
       child: AnimatedBuilder(
         animation: ctrl,
-        builder: (_, __) => Transform.scale(
+        builder: (_, _) => Transform.scale(
           scale: 1.0 + ctrl.value * 0.12,
           child: Container(
             width: size,

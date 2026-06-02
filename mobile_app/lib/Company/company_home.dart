@@ -56,10 +56,11 @@ class _CompanyHomePageState extends State<CompanyHomePage> {
       await Future.wait([_loadCompany(), _loadJobs()]);
       await _loadApplications();
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -87,10 +88,11 @@ class _CompanyHomePageState extends State<CompanyHomePage> {
         .select()
         .eq('company_id', widget.companyId)
         .order('created_at', ascending: false);
-    if (mounted)
+    if (mounted) {
       setState(
         () => _jobs = (rows as List).map((r) => JobPosting.fromMap(r)).toList(),
       );
+    }
   }
 
   Future<void> _loadApplications() async {
@@ -102,12 +104,13 @@ class _CompanyHomePageState extends State<CompanyHomePage> {
         .select()
         .inFilter('job_id', ids)
         .order('applied_at', ascending: false);
-    if (mounted)
+    if (mounted) {
       setState(
         () => _applications = (rows as List)
             .map((r) => JobApplication.fromMap(r))
             .toList(),
       );
+    }
   }
 
   Future<void> _updateStatus(JobApplication app, String status) async {
@@ -148,7 +151,7 @@ class _CompanyHomePageState extends State<CompanyHomePage> {
   Future<void> _removeApplicant(JobApplication app) async {
     await _db.from('Job_applications').delete().eq('id', app.id!);
     setState(() => _applications.removeWhere((a) => a.id == app.id));
-    if (mounted)
+    if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('${app.studentName} removed.'),
@@ -160,6 +163,7 @@ class _CompanyHomePageState extends State<CompanyHomePage> {
           margin: const EdgeInsets.all(16),
         ),
       );
+    }
   }
 
   String _greeting() {
@@ -184,11 +188,12 @@ class _CompanyHomePageState extends State<CompanyHomePage> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading)
+    if (_loading) {
       return Scaffold(
         backgroundColor: Theme.of(context).colorScheme.surface,
         body: const Center(child: CircularProgressIndicator(color: _teal)),
       );
+    }
 
     final pages = [
       _DashboardTab(
@@ -777,7 +782,7 @@ class _JobMgmtSheetState extends State<_JobMgmtSheet> {
           'message': ctrl.text.trim(),
         });
       } catch (_) {}
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Message sent to ${_apps.length} applicants!'),
@@ -789,6 +794,7 @@ class _JobMgmtSheetState extends State<_JobMgmtSheet> {
             margin: const EdgeInsets.all(16),
           ),
         );
+      }
     }
     ctrl.dispose();
   }
@@ -928,10 +934,11 @@ class _JobMgmtSheetState extends State<_JobMgmtSheet> {
                                     final idx = _apps.indexWhere(
                                       (a) => a.id == app.id,
                                     );
-                                    if (idx != -1)
+                                    if (idx != -1) {
                                       _apps[idx] = app.copyWith(
                                         status: 'interview',
                                       );
+                                    }
                                   });
                                 }
                               : null,
@@ -1211,14 +1218,16 @@ class _PostJobTabState extends State<_PostJobTab> {
 
   @override
   void dispose() {
-    [
+    for (var c in [
       _titleCtrl,
       _descCtrl,
       _reqCtrl,
       _locCtrl,
       _durCtrl,
       _spotsCtrl,
-    ].forEach((c) => c.dispose());
+    ]) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -1246,21 +1255,24 @@ class _PostJobTabState extends State<_PostJobTab> {
             behavior: SnackBarBehavior.floating,
           ),
         );
-        [
+        for (var c in [
           _titleCtrl,
           _descCtrl,
           _reqCtrl,
           _locCtrl,
           _durCtrl,
           _spotsCtrl,
-        ].forEach((c) => c.clear());
+        ]) {
+          c.clear();
+        }
         widget.onPosted();
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -2023,7 +2035,7 @@ class _ProfileSheetState extends State<_ProfileSheet> {
           .select()
           .eq('user_id', widget.app.studentId)
           .order('id', ascending: false);
-      if (mounted)
+      if (mounted) {
         setState(() {
           _about = (info?['about'] ?? '') as String;
           final raw = (info?['skills'] ?? '') as String;
@@ -2039,6 +2051,7 @@ class _ProfileSheetState extends State<_ProfileSheet> {
               .toList();
           _loading = false;
         });
+      }
     } catch (_) {
       if (mounted) setState(() => _loading = false);
     }
@@ -2757,7 +2770,6 @@ class _BottomBar extends StatelessWidget {
   final int index, pending;
   final ValueChanged<int> onTap;
   const _BottomBar({
-    super.key,
     required this.index,
     required this.pending,
     required this.onTap,

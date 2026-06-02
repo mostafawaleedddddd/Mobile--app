@@ -748,7 +748,7 @@ class _PostAnnouncementPageState extends State<PostAnnouncementPage> {
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
-                  value: _selectedTag,
+                  initialValue: _selectedTag,
                   dropdownColor: theme.surfaceContainerHighest,
                   style: TextStyle(color: theme.onSurface),
                   decoration: InputDecoration(
@@ -1096,7 +1096,7 @@ class _CompanyManagementPageState extends State<CompanyManagementPage> {
                                             'location': location,
                                             'password': password,
                                           })
-                                          .eq('id', existing!['id']);
+                                          .eq('id', existing['id']);
                                     } else {
                                       await _db
                                           .from('Company_profile')

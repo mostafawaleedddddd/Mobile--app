@@ -77,8 +77,8 @@ class OnboardingPage2 extends StatelessWidget {
                           color: _accent,
                           onTap: () => Navigator.of(context).push(
                             PageRouteBuilder(
-                              pageBuilder: (_, a, __) => const OnboardingPage3(),
-                              transitionsBuilder: (_, a, __, child) => FadeTransition(opacity: a, child: child),
+                              pageBuilder: (_, a, _) => const OnboardingPage3(),
+                              transitionsBuilder: (_, a, _, child) => FadeTransition(opacity: a, child: child),
                               transitionDuration: const Duration(milliseconds: 400),
                             ),
                           ),

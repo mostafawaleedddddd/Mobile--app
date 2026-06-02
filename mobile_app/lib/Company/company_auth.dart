@@ -89,7 +89,7 @@ class _CompanyAuthScreenState extends State<CompanyAuthScreen>
                 ),
                 child: AnimatedBuilder(
                   animation: _anim,
-                  builder: (_, __) {
+                  builder: (_, _) {
                     final angle = _anim.value * pi;
                     final showFront = angle < pi / 2;
                     return Transform(

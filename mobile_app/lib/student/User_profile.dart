@@ -102,14 +102,14 @@ Future<String?> pickFullDate(
         bool monthDisabled(int year, int month) {
           final lastOfMonth  = DateTime(year, month, DateUtils.getDaysInMonth(year, month));
           final firstOfMonth = DateTime(year, month, 1);
-          if (minDate != null && lastOfMonth.isBefore(minDate!)) return true;
+          if (minDate != null && lastOfMonth.isBefore(minDate)) return true;
           if (firstOfMonth.isAfter(effectiveMax)) return true;
           return false;
         }
 
         bool dayDisabled(int day) {
           final d = DateTime(sel.year, sel.month, day);
-          if (minDate != null && d.isBefore(minDate!)) return true;
+          if (minDate != null && d.isBefore(minDate)) return true;
           if (d.isAfter(effectiveMax)) return true;
           return false;
         }
@@ -132,7 +132,7 @@ Future<String?> pickFullDate(
                         onPressed: () => ss(() {
                           final prev = DateTime(sel.year - 1, sel.month,
                               sel.day.clamp(1, DateUtils.getDaysInMonth(sel.year - 1, sel.month)));
-                          if (minDate == null || !DateTime(prev.year, 12, 31).isBefore(minDate!)) sel = prev;
+                          if (minDate == null || !DateTime(prev.year, 12, 31).isBefore(minDate)) sel = prev;
                         }),
                       ),
                       Text('${sel.year}',
@@ -775,7 +775,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       : Image.network(
                                           existingImageValue,
                                           fit: BoxFit.cover,
-                                          errorBuilder: (c, _, __) => const Center(
+                                          errorBuilder: (c, _, _) => const Center(
                                             child: Icon(Icons.broken_image_outlined, color: _blue),
                                           ),
                                         ),
@@ -941,7 +941,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       : Image.network(
                           imageUrl,
                           fit: BoxFit.contain,
-                          errorBuilder: (context, _, __) => Container(
+                          errorBuilder: (context, _, _) => Container(
                             height: 220,
                             color: _blue.withOpacity(0.1),
                             child: const Center(
@@ -1278,7 +1278,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(width: 10),
                     _StatCard(value: '${_certs.length}', label: 'Certificates\nUploaded'),
                     const SizedBox(width: 10),
-                    _StatCard(value: '${_surveyCount}', label: 'Surveys\nCompleted'),
+                    _StatCard(value: '$_surveyCount', label: 'Surveys\nCompleted'),
                   ]),
                 ),
               ),
@@ -1624,14 +1624,14 @@ class _CertCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
               child: imageBytes != null
                   ? Image.memory(imageBytes, width: 92, height: 92, fit: BoxFit.cover,
-                      errorBuilder: (ctx, _, __) => Container(width: 92, height: 92, color: _blue.withOpacity(0.1),
+                      errorBuilder: (ctx, _, _) => Container(width: 92, height: 92, color: _blue.withOpacity(0.1),
                           child: const Center(child: Icon(Icons.broken_image_outlined, color: _blue))))
                   : Image.network(imageUrl, width: 92, height: 92, fit: BoxFit.cover,
                       loadingBuilder: (ctx, child, prog) => prog == null ? child :
                           Container(width: 92, height: 92, color: _blue.withOpacity(0.1),
                               child: const Center(child: SizedBox(width: 22, height: 22,
                                   child: CircularProgressIndicator(color: _blue, strokeWidth: 2.4)))),
-                      errorBuilder: (ctx, _, __) => Container(width: 92, height: 92, color: _blue.withOpacity(0.1),
+                      errorBuilder: (ctx, _, _) => Container(width: 92, height: 92, color: _blue.withOpacity(0.1),
                           child: const Center(child: Icon(Icons.broken_image_outlined, color: _blue)))),
             ),
           )
@@ -1908,8 +1908,9 @@ class _SectionTitle extends StatelessWidget {
               child: InkWell(
                 borderRadius: BorderRadius.circular(20),
                 onTap: () {
-                  if (onTapWhileDeleteMode != null)      onTapWhileDeleteMode!();
-                  else if (onActionWithContext != null)  onActionWithContext!(ctx);
+                  if (onTapWhileDeleteMode != null) {
+                    onTapWhileDeleteMode!();
+                  } else if (onActionWithContext != null)  onActionWithContext!(ctx);
                   else                                   onAction();
                 },
                 child: Padding(
