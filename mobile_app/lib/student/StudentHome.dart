@@ -1680,14 +1680,24 @@ class _NavItem extends StatelessWidget {
 
 Color _getLiveTypeColor(String? type) {
   switch (type) {
-    case 'Event':
-      return const Color(0xFF8B5CF6);
-    case 'Important':
-      return const Color(0xFFEC4899);
     case 'News':
-      return const Color(0xFF3B82F6);
+      return const Color(0xFF3B82F6);      // Blue
+    case 'Event':
+      return const Color(0xFF8B5CF6);      // Purple 
     case 'Reminder':
-      return const Color(0xFF059669);
+      return const Color(0xFFEC4899);      // Green
+    case 'Opportunity':
+      return const Color(0xFFF59E0B);      // Amber
+    case 'Courses':
+      return const Color(0xFF06B6D4);      // Cyan
+    case 'Training':
+      return const Color(0xFF10B981);      // Emerald
+    case 'Internship':
+      return const Color(0xFFF97316);      // Orange
+    case 'Workshop':
+      return const Color(0xFFEF4444);      // Red
+    case 'Other':
+      return const Color(0xFF6B7280);      // Gray
     default:
       return Colors.blueGrey;
   }

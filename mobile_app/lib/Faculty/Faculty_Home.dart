@@ -23,15 +23,17 @@ class _FacultyHomePageState extends State<FacultyHomePage> {
   int _currentIndex = 0;
 
   late final List<Widget> _pages;
+  final GlobalKey<_FacultyProfilePageState> _profileKey =
+      GlobalKey<_FacultyProfilePageState>();
 
   @override
   void initState() {
     super.initState();
     _pages = [
-      const ReviewQueuePage(),
+      ReviewQueuePage(onGoToProfile: () => setState(() => _currentIndex = 3)),
       PostAnnouncementPage(facultyId: FacultySession.facultyId ?? 0),
       const CompanyManagementPage(),
-      const FacultyProfilePage(),
+      FacultyProfilePage(key: _profileKey),
     ];
   }
 
@@ -50,7 +52,13 @@ class _FacultyHomePageState extends State<FacultyHomePage> {
         ),
         child: BottomNavigationBar(
           currentIndex: _currentIndex,
-          onTap: (index) => setState(() => _currentIndex = index),
+          onTap: (index) {
+            // Reload stats whenever the Profile tab is opened
+            if (index == 3) {
+              _profileKey.currentState?._loadStats();
+            }
+            setState(() => _currentIndex = index);
+          },
           type: BottomNavigationBarType.fixed,
           backgroundColor:
               Theme.of(context).colorScheme.surfaceContainerHighest,
@@ -91,7 +99,8 @@ class _FacultyHomePageState extends State<FacultyHomePage> {
 // SECTION 1: REVIEW QUEUE (Vetting)
 // ──────────────────────────────────────────────────────────────────────────────
 class ReviewQueuePage extends StatefulWidget {
-  const ReviewQueuePage({super.key});
+  final VoidCallback? onGoToProfile;
+  const ReviewQueuePage({super.key, this.onGoToProfile});
 
   @override
   State<ReviewQueuePage> createState() => _ReviewQueuePageState();
@@ -100,6 +109,13 @@ class ReviewQueuePage extends StatefulWidget {
 class _ReviewQueuePageState extends State<ReviewQueuePage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+
+  String _initials() {
+    final name = FacultySession.name ?? '';
+    final parts = name.trim().split(' ').where((e) => e.isNotEmpty).toList();
+    if (parts.isEmpty) return 'F';
+    return parts.take(2).map((e) => e[0].toUpperCase()).join();
+  }
 
   @override
   void initState() {
@@ -115,7 +131,7 @@ class _ReviewQueuePageState extends State<ReviewQueuePage>
         automaticallyImplyLeading: false,
         title: Text("Faculty Vetting",
             style:
-                TextStyle(color: Theme.of(context).colorScheme.onSurface)),
+                TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.bold)),
         backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
         actions: [
@@ -131,7 +147,47 @@ class _ReviewQueuePageState extends State<ReviewQueuePage>
               ),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 4),
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: Material(
+              color: Colors.transparent,
+              shape: const CircleBorder(),
+              child: Ink(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF818CF8), _facultyIndigo],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _facultyIndigo.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: InkWell(
+                  onTap: widget.onGoToProfile,
+                  customBorder: const CircleBorder(),
+                  child: Center(
+                    child: Text(
+                      _initials(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
         ],
         bottom: TabBar(
           controller: _tabController,
@@ -633,7 +689,7 @@ class _PostAnnouncementPageState extends State<PostAnnouncementPage> {
   String _selectedTag = 'News';
   bool _isPosting = false;
 
-  final List<String> _tags = ['News', 'Event', 'Important', 'Reminder'];
+  final List<String> _tags = ['News', 'Event', 'Reminder' , 'Opportunity' , 'Courses', 'Training', 'Internship', 'Workshop', 'Other'];
 
   Future<void> _broadcastAnnouncement() async {
     if (_titleController.text.isEmpty || _bodyController.text.isEmpty) {
@@ -799,7 +855,7 @@ class _PostAnnouncementPageState extends State<PostAnnouncementPage> {
                     onPressed:
                         _isPosting ? null : _broadcastAnnouncement,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: _accentTeal,
+                      backgroundColor: _facultyIndigo,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),
@@ -1646,25 +1702,475 @@ class _CompanyManagementPageState extends State<CompanyManagementPage> {
 // ──────────────────────────────────────────────────────────────────────────────
 // SECTION 4: PROFILE & LOGOUT
 // ──────────────────────────────────────────────────────────────────────────────
-class FacultyProfilePage extends StatelessWidget {
+class FacultyProfilePage extends StatefulWidget {
   const FacultyProfilePage({super.key});
+
+  @override
+  State<FacultyProfilePage> createState() => _FacultyProfilePageState();
+}
+
+class _FacultyProfilePageState extends State<FacultyProfilePage> {
+  // Stats loaded from Supabase
+  int _announcementCount = 0;
+  int _pendingVettingCount = 0;
+  int _companiesCount = 0;
+  bool _statsLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStats();
+  }
+
+  Future<void> _loadStats() async {
+    setState(() => _statsLoading = true);
+    try {
+      final facultyId = FacultySession.facultyId;
+      final results = await Future.wait([
+        // Announcements posted by this faculty
+        _db
+            .from('university_announcements')
+            .select('id')
+            .eq('faculty_id', facultyId ?? 0),
+        // All job postings (no status column — count all pending review)
+        _db
+            .from('Job_postings')
+            .select('id'),
+        // Total companies
+        _db.from('Company_profile').select('id'),
+      ]);
+
+      if (mounted) {
+        setState(() {
+          _announcementCount = (results[0] as List).length;
+          _pendingVettingCount = (results[1] as List).length;
+          _companiesCount = (results[2] as List).length;
+          _statsLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _statsLoading = false);
+    }
+  }
+
+  /// Opens a bottom sheet to edit the faculty's display name and department.
+  void _showEditProfileSheet(ColorScheme theme) {
+    final nameCtrl =
+        TextEditingController(text: FacultySession.name ?? '');
+    final deptCtrl =
+        TextEditingController(text: FacultySession.department ?? '');
+    bool isSaving = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding:
+              EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+            decoration: BoxDecoration(
+              color: theme.surface,
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(28)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                        color: theme.outline,
+                        borderRadius: BorderRadius.circular(2)),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text("Edit Profile",
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: theme.onSurface)),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: nameCtrl,
+                  style: TextStyle(color: theme.onSurface),
+                  decoration: InputDecoration(
+                    labelText: "Display Name",
+                    prefixIcon:
+                        Icon(Icons.person_outline, color: theme.primary),
+                    labelStyle:
+                        TextStyle(color: theme.onSurfaceVariant),
+                    filled: true,
+                    fillColor: theme.surfaceContainerHighest,
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none),
+                    enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide:
+                            BorderSide(color: theme.outline)),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: deptCtrl,
+                  style: TextStyle(color: theme.onSurface),
+                  decoration: InputDecoration(
+                    labelText: "Department",
+                    prefixIcon: Icon(Icons.school_outlined,
+                        color: theme.primary),
+                    labelStyle:
+                        TextStyle(color: theme.onSurfaceVariant),
+                    filled: true,
+                    fillColor: theme.surfaceContainerHighest,
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none),
+                    enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide:
+                            BorderSide(color: theme.outline)),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton.icon(
+                    onPressed: isSaving
+                        ? null
+                        : () async {
+                            if (nameCtrl.text.trim().isEmpty) return;
+                            setSheet(() => isSaving = true);
+                            try {
+                              await _db
+                                  .from('faculty_profile')
+                                  .update({
+                                    'name': nameCtrl.text.trim(),
+                                    'department': deptCtrl.text.trim(),
+                                  })
+                                  .eq('id',
+                                      FacultySession.facultyId ?? 0);
+                              FacultySession.name = nameCtrl.text.trim();
+                              FacultySession.department =
+                                  deptCtrl.text.trim();
+                              if (mounted) {
+                                Navigator.pop(ctx);
+                                setState(() {});
+                                ScaffoldMessenger.of(context)
+                                    .showSnackBar(const SnackBar(
+                                        content: Text(
+                                            'Profile updated!')));
+                              }
+                            } catch (e) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context)
+                                    .showSnackBar(SnackBar(
+                                        content: Text(
+                                            'Error updating: $e')));
+                              }
+                            } finally {
+                              setSheet(() => isSaving = false);
+                            }
+                          },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _facultyIndigo,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: isSaving
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                                color: Colors.white, strokeWidth: 2))
+                        : const Icon(Icons.save_rounded),
+                    label: const Text("Save Changes",
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 15)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Opens a bottom sheet to change the faculty's password.
+  void _showChangePasswordSheet(ColorScheme theme) {
+    final currentCtrl = TextEditingController();
+    final newCtrl = TextEditingController();
+    final confirmCtrl = TextEditingController();
+    bool obscureCurrent = true;
+    bool obscureNew = true;
+    bool obscureConfirm = true; // ← separate toggle for confirm field
+    bool isSaving = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding:
+              EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+            decoration: BoxDecoration(
+              color: theme.surface,
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(28)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                        color: theme.outline,
+                        borderRadius: BorderRadius.circular(2)),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text("Change Password",
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: theme.onSurface)),
+                const SizedBox(height: 20),
+                _passwordField(
+                  controller: currentCtrl,
+                  label: "Current Password",
+                  obscure: obscureCurrent,
+                  onToggle: () =>
+                      setSheet(() => obscureCurrent = !obscureCurrent),
+                  theme: theme,
+                ),
+                const SizedBox(height: 14),
+                _passwordField(
+                  controller: newCtrl,
+                  label: "New Password",
+                  obscure: obscureNew,
+                  onToggle: () =>
+                      setSheet(() => obscureNew = !obscureNew),
+                  theme: theme,
+                ),
+                const SizedBox(height: 14),
+                _passwordField(
+                  controller: confirmCtrl,
+                  label: "Confirm New Password",
+                  obscure: obscureConfirm, // ← fixed: own toggle
+                  onToggle: () =>
+                      setSheet(() => obscureConfirm = !obscureConfirm),
+                  theme: theme,
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton.icon(
+                    onPressed: isSaving
+                        ? null
+                        : () async {
+                            if (currentCtrl.text.trim().isEmpty ||
+                                newCtrl.text.trim().isEmpty ||
+                                confirmCtrl.text.trim().isEmpty) {
+                              ScaffoldMessenger.of(context)
+                                  .showSnackBar(const SnackBar(
+                                      content:
+                                          Text('Please fill all fields.')));
+                              return;
+                            }
+                            if (newCtrl.text != confirmCtrl.text) {
+                              ScaffoldMessenger.of(context)
+                                  .showSnackBar(const SnackBar(
+                                      content: Text(
+                                          'Passwords do not match.')));
+                              return;
+                            }
+                            if (newCtrl.text.length < 6) {
+                              ScaffoldMessenger.of(context)
+                                  .showSnackBar(const SnackBar(
+                                      content: Text(
+                                          'Password must be at least 6 characters.')));
+                              return;
+                            }
+                            setSheet(() => isSaving = true);
+                            try {
+                              // Verify current password then update
+                              // ← fixed table name: faculty_profile (lowercase)
+                              final check = await _db
+                                  .from('faculty_profile')
+                                  .select('id')
+                                  .eq('id',
+                                      FacultySession.facultyId ?? 0)
+                                  .eq('password', currentCtrl.text.trim())
+                                  .maybeSingle();
+                              if (check == null) {
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context)
+                                      .showSnackBar(const SnackBar(
+                                          content: Text(
+                                              'Current password is incorrect.')));
+                                }
+                                setSheet(() => isSaving = false);
+                                return;
+                              }
+                              // ← fixed table name: faculty_profile (lowercase)
+                              await _db
+                                  .from('faculty_profile')
+                                  .update({'password': newCtrl.text.trim()})
+                                  .eq('id',
+                                      FacultySession.facultyId ?? 0);
+                              if (mounted) {
+                                Navigator.pop(ctx);
+                                ScaffoldMessenger.of(context)
+                                    .showSnackBar(const SnackBar(
+                                        content: Text(
+                                            'Password changed successfully!')));
+                              }
+                            } catch (e) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context)
+                                    .showSnackBar(SnackBar(
+                                        content: Text('Error: $e')));
+                              }
+                            } finally {
+                              setSheet(() => isSaving = false);
+                            }
+                          },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _facultyIndigo,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: isSaving
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                                color: Colors.white, strokeWidth: 2))
+                        : const Icon(Icons.lock_outline_rounded),
+                    label: const Text("Update Password",
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 15)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _passwordField({
+    required TextEditingController controller,
+    required String label,
+    required bool obscure,
+    required VoidCallback onToggle,
+    required ColorScheme theme,
+  }) {
+    return TextField(
+      controller: controller,
+      obscureText: obscure,
+      style: TextStyle(color: theme.onSurface),
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(Icons.lock_outline, color: theme.primary),
+        suffixIcon: IconButton(
+          icon: Icon(
+              obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+              color: theme.onSurfaceVariant),
+          onPressed: onToggle,
+        ),
+        labelStyle: TextStyle(color: theme.onSurfaceVariant),
+        filled: true,
+        fillColor: theme.surfaceContainerHighest,
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: theme.outline)),
+      ),
+    );
+  }
+
+  void _confirmLogout(BuildContext context, ColorScheme theme) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: theme.surfaceContainerHighest,
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Log Out',
+            style: TextStyle(
+                fontWeight: FontWeight.w700, color: theme.onSurface)),
+        content: Text('Are you sure you want to log out?',
+            style: TextStyle(color: theme.onSurfaceVariant)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel',
+                style: TextStyle(color: theme.onSurfaceVariant)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              FacultySession.clear();
+              Navigator.of(context).popUntil((route) => route.isFirst);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('Log Out'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context).colorScheme;
     final sw = MediaQuery.of(context).size.width;
     final sh = MediaQuery.of(context).size.height;
+    final isDark = theme.brightness == Brightness.dark;
+    final indigoText =
+        isDark ? Colors.indigo.shade200 : _facultyIndigo;
 
     return Scaffold(
       backgroundColor: theme.surface,
       appBar: AppBar(
-        title: Text("Faculty Profile",
+        title: Text("My Profile",
             style: TextStyle(
                 color: theme.onSurface, fontWeight: FontWeight.bold)),
         automaticallyImplyLeading: false,
         backgroundColor: theme.surface,
         elevation: 0,
         actions: [
+          // Edit profile shortcut
+          IconButton(
+            icon: Icon(Icons.edit_outlined, color: _facultyIndigo),
+            tooltip: "Edit Profile",
+            onPressed: () => _showEditProfileSheet(theme),
+          ),
           Consumer<ThemeProvider>(
             builder: (context, themeProvider, child) => IconButton(
               onPressed: () => themeProvider.toggleTheme(),
@@ -1677,7 +2183,7 @@ class FacultyProfilePage extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 4),
         ],
       ),
       body: Stack(
@@ -1695,95 +2201,242 @@ class FacultyProfilePage extends StatelessWidget {
             child: _Blob(
                 size: sw * 0.7, color: _accentTeal.withOpacity(0.06)),
           ),
-          Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
+          RefreshIndicator(
+            color: _facultyIndigo,
+            onRefresh: _loadStats,
+            child: ListView(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 20, vertical: 12),
               children: [
-                CircleAvatar(
-                  radius: 45,
-                  backgroundColor: theme.primary.withOpacity(0.1),
-                  child:
-                      Icon(Icons.person, size: 45, color: theme.primary),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  FacultySession.name ?? "Faculty Member",
-                  style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: theme.onSurface),
-                ),
-                Text(
-                  FacultySession.email ?? "email@university.edu",
-                  style: TextStyle(color: theme.onSurfaceVariant),
-                ),
-                const SizedBox(height: 12),
+                // ── AVATAR + NAME CARD ────────────────────────────────
                 Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 6),
+                      vertical: 28, horizontal: 20),
                   decoration: BoxDecoration(
-                    color: _facultyIndigo.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                        color: _facultyIndigo.withOpacity(0.2)),
-                  ),
-                  child: Text(
-                    FacultySession.department ?? "Department",
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: theme.brightness == Brightness.dark
-                          ? Colors.indigo.shade200
-                          : _facultyIndigo,
+                    gradient: LinearGradient(
+                      colors: [
+                        _facultyIndigo.withOpacity(0.85),
+                        const Color(0xFF818CF8),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _facultyIndigo.withOpacity(0.3),
+                        blurRadius: 20,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      // Avatar with gradient border
+                      Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.white.withOpacity(0.8),
+                              Colors.white.withOpacity(0.3),
+                            ],
+                          ),
+                        ),
+                        child: CircleAvatar(
+                          radius: 44,
+                          backgroundColor: Colors.white.withOpacity(0.2),
+                          child: Text(
+                            _initials(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 28,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        FacultySession.name ?? "Faculty Member",
+                        style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        FacultySession.email ?? "email@university.edu",
+                        style: TextStyle(
+                            color: Colors.white.withOpacity(0.85),
+                            fontSize: 13),
+                      ),
+                      const SizedBox(height: 12),
+                      // Badges row
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          if (FacultySession.designation != null &&
+                              FacultySession.designation!.isNotEmpty)
+                            _badge(
+                                FacultySession.designation!,
+                                Icons.workspace_premium_outlined,
+                                Colors.white.withOpacity(0.25)),
+                          const SizedBox(width: 8),
+                          _badge(
+                              FacultySession.department ?? "Department",
+                              Icons.school_outlined,
+                              Colors.white.withOpacity(0.25)),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-                const Spacer(),
+
+                const SizedBox(height: 20),
+
+                // ── STATS ROW ─────────────────────────────────────────
+                Row(
+                  children: [
+                    Expanded(
+                      child: _statCard(
+                        theme,
+                        icon: Icons.campaign_rounded,
+                        label: "Announcements",
+                        value: _statsLoading
+                            ? '—'
+                            : '$_announcementCount',
+                        color: _facultyIndigo,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _statCard(
+                        theme,
+                        icon: Icons.pending_actions_rounded,
+                        label: "Pending Jobs",
+                        value: _statsLoading
+                            ? '—'
+                            : '$_pendingVettingCount',
+                        color: Colors.orange.shade600,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _statCard(
+                        theme,
+                        icon: Icons.business_rounded,
+                        label: "Companies",
+                        value: _statsLoading
+                            ? '—'
+                            : '$_companiesCount',
+                        color: _accentTeal,
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 20),
+
+                // ── QUICK ACTIONS ─────────────────────────────────────
+                Text("Quick Actions",
+                    style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: theme.onSurface)),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _actionTile(
+                        theme,
+                        icon: Icons.edit_outlined,
+                        label: "Edit Profile",
+                        color: _facultyIndigo,
+                        onTap: () => _showEditProfileSheet(theme),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _actionTile(
+                        theme,
+                        icon: Icons.lock_outline_rounded,
+                        label: "Change Password",
+                        color: _accentTeal,
+                        onTap: () => _showChangePasswordSheet(theme),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _actionTile(
+                        theme,
+                        icon: Icons.refresh_rounded,
+                        label: "Refresh Stats",
+                        color: Colors.deepPurple,
+                        onTap: _loadStats,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _actionTile(
+                        theme,
+                        icon: Icons.info_outline_rounded,
+                        label: "About App",
+                        color: Colors.blueGrey,
+                        onTap: () => _showAboutSheet(theme),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 24),
+
+                // ── ACCOUNT INFO SECTION ──────────────────────────────
+                Text("Account Information",
+                    style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: theme.onSurface)),
+                const SizedBox(height: 12),
+                _infoRow(
+                  theme,
+                  icon: Icons.badge_outlined,
+                  label: "Faculty ID",
+                  value: '#${FacultySession.facultyId ?? '—'}',
+                ),
+                _infoRow(
+                  theme,
+                  icon: Icons.alternate_email_rounded,
+                  label: "Email",
+                  value:
+                      FacultySession.email ?? "—",
+                ),
+                _infoRow(
+                  theme,
+                  icon: Icons.school_outlined,
+                  label: "Department",
+                  value: FacultySession.department ?? "—",
+                ),
+                _infoRow(
+                  theme,
+                  icon: Icons.workspace_premium_outlined,
+                  label: "Designation",
+                  value: FacultySession.designation ?? "—",
+                ),
+
+                const SizedBox(height: 28),
+
+                // ── LOGOUT ────────────────────────────────────────────
                 SizedBox(
                   width: double.infinity,
                   height: 50,
                   child: OutlinedButton.icon(
-                    onPressed: () {
-                      showDialog(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          backgroundColor: theme.surfaceContainerHighest,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16)),
-                          title: Text('Log Out',
-                              style: TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  color: theme.onSurface)),
-                          content: Text('Are you sure you want to log out?',
-                              style:
-                                  TextStyle(color: theme.onSurfaceVariant)),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(ctx),
-                              child: Text('Cancel',
-                                  style: TextStyle(
-                                      color: theme.onSurfaceVariant)),
-                            ),
-                            ElevatedButton(
-                              onPressed: () {
-                                Navigator.pop(ctx);
-                                FacultySession.clear();
-                                Navigator.of(context)
-                                    .popUntil((route) => route.isFirst);
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.red,
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(
-                                    borderRadius:
-                                        BorderRadius.circular(8)),
-                              ),
-                              child: const Text('Log Out'),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
+                    onPressed: () => _confirmLogout(context, theme),
                     icon: const Icon(Icons.logout_rounded,
                         color: Colors.red, size: 18),
                     label: const Text('Log Out',
@@ -1792,17 +2445,233 @@ class FacultyProfilePage extends StatelessWidget {
                             fontSize: 15,
                             fontWeight: FontWeight.w700)),
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Colors.red, width: 1.4),
+                      side: const BorderSide(
+                          color: Colors.red, width: 1.4),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),
                     ),
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 28),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // ── Helpers ──
+
+  String _initials() {
+    final name = FacultySession.name ?? '';
+    final parts =
+        name.trim().split(' ').where((e) => e.isNotEmpty).toList();
+    if (parts.isEmpty) return 'F';
+    return parts.take(2).map((e) => e[0].toUpperCase()).join();
+  }
+
+  Widget _badge(String label, IconData icon, Color bg) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+          color: bg, borderRadius: BorderRadius.circular(20)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: Colors.white, size: 12),
+          const SizedBox(width: 4),
+          Text(label,
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+
+  Widget _statCard(ColorScheme theme,
+      {required IconData icon,
+      required String label,
+      required String value,
+      required Color color}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+      decoration: BoxDecoration(
+        color: theme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: color, size: 24),
+          const SizedBox(height: 6),
+          Text(value,
+              style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: theme.onSurface)),
+          const SizedBox(height: 2),
+          Text(label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontSize: 10,
+                  color: theme.onSurfaceVariant,
+                  fontWeight: FontWeight.w500)),
+        ],
+      ),
+    );
+  }
+
+  Widget _actionTile(ColorScheme theme,
+      {required IconData icon,
+      required String label,
+      required Color color,
+      required VoidCallback onTap}) {
+    return Material(
+      color: theme.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding:
+              const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: color, size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(label,
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: theme.onSurface)),
+              ),
+              Icon(Icons.chevron_right,
+                  size: 16, color: theme.onSurfaceVariant),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _infoRow(ColorScheme theme,
+      {required IconData icon,
+      required String label,
+      required String value}) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: theme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: _facultyIndigo),
+          const SizedBox(width: 12),
+          Text(label,
+              style: TextStyle(
+                  fontSize: 13,
+                  color: theme.onSurfaceVariant,
+                  fontWeight: FontWeight.w500)),
+          const Spacer(),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: theme.onSurface),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAboutSheet(ColorScheme theme) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
+        decoration: BoxDecoration(
+          color: theme.surface,
+          borderRadius:
+              const BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                  color: theme.outline,
+                  borderRadius: BorderRadius.circular(2)),
+            ),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF818CF8), _facultyIndigo],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Icon(Icons.school_rounded,
+                  color: Colors.white, size: 32),
+            ),
+            const SizedBox(height: 16),
+            Text("Faculty Portal",
+                style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: theme.onSurface)),
+            const SizedBox(height: 6),
+            Text("Version 1.0.0",
+                style: TextStyle(color: theme.onSurfaceVariant)),
+            const SizedBox(height: 12),
+            Text(
+              "A dedicated portal for faculty members to manage internship vetting, post university announcements, and oversee company registrations.",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontSize: 13,
+                  color: theme.onSurfaceVariant,
+                  height: 1.5),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 46,
+              child: OutlinedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: theme.outline),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+                child: Text("Close",
+                    style: TextStyle(color: theme.onSurface)),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
