@@ -321,169 +321,11 @@ class _ReviewQueuePageState extends State<ReviewQueuePage>
   }
 
   void _showCertificates(int userId, String name) {
-    final theme = Theme.of(context).colorScheme;
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) {
-        return DraggableScrollableSheet(
-          initialChildSize: 0.85,
-          builder: (_, scrollController) {
-            return Container(
-              decoration: BoxDecoration(
-                color: theme.surface,
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-              child: FutureBuilder<List<Map<String, dynamic>>>(
-                future: _db
-                    .from('Certificates')
-                    .select()
-                    .eq('user_id', userId)
-                    .limit(20),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
-                    return Center(
-                        child: CircularProgressIndicator(
-                            color: theme.primary));
-                  }
-
-                  final certs = snapshot.data!;
-
-                  if (certs.isEmpty) {
-                    return Center(
-                        child: Text("No certificates found.",
-                            style:
-                                TextStyle(color: theme.onSurfaceVariant)));
-                  }
-
-                  return Column(
-                    children: [
-                      const SizedBox(height: 12),
-                      Container(
-                          width: 40,
-                          height: 4,
-                          decoration: BoxDecoration(
-                              color: theme.outline,
-                              borderRadius: BorderRadius.circular(2))),
-                      const SizedBox(height: 16),
-                      Text(
-                        "Certificates: $name",
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: theme.onSurface,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Expanded(
-                        child: ListView.builder(
-                          controller: scrollController,
-                          itemCount: certs.length,
-                          itemBuilder: (context, i) =>
-                              _certificateCard(certs[i]),
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _certificateCard(Map<String, dynamic> cert) {
-    final theme = Theme.of(context).colorScheme;
-    final imageUrl = cert['image_url'] ?? '';
-
-    Widget imageWidget = const SizedBox();
-
-    if (imageUrl.isNotEmpty) {
-      if (imageUrl.startsWith('data:image')) {
-        try {
-          final bytes = base64Decode(imageUrl.split(',').last);
-          imageWidget = Image.memory(bytes,
-              height: 200, width: double.infinity, fit: BoxFit.cover);
-        } catch (e) {
-          imageWidget = Container(
-              height: 200,
-              width: double.infinity,
-              color: theme.surfaceContainerHighest,
-              child: const Center(child: Text("Invalid image")));
-        }
-      } else {
-        imageWidget = Image.network(imageUrl,
-            height: 200, width: double.infinity, fit: BoxFit.cover);
-      }
-    }
-
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: theme.surfaceContainerHighest,
-      clipBehavior: Clip.antiAlias,
-      elevation: 0,
-      shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ListTile(
-            title: Text(cert['title'] ?? '',
-                style: TextStyle(
-                    color: theme.onSurface,
-                    fontWeight: FontWeight.bold)),
-            subtitle: Text(cert['date']?.toString() ?? '',
-                style: TextStyle(color: theme.onSurfaceVariant)),
-          ),
-          GestureDetector(
-            onTap: () => _showFullImage(imageUrl),
-            child: imageWidget,
-          ),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextButton(
-                    onPressed: () async {
-                      await _db
-                          .from('Certificates')
-                          .delete()
-                          .eq('id', cert['id']);
-                      Navigator.pop(context);
-                    },
-                    child: const Text("Reject",
-                        style: TextStyle(color: Colors.red)),
-                  ),
-                ),
-                Expanded(
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: theme.primary,
-                      foregroundColor: theme.onPrimary,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8)),
-                    ),
-                    onPressed: () async {
-                      await _db
-                          .from('Certificates')
-                          .update({'is_verified': true})
-                          .eq('id', cert['id']);
-                      Navigator.pop(context);
-                    },
-                    child: const Text("Accept"),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+      builder: (context) => _CertificatesSheet(userId: userId, name: name),
     );
   }
 
@@ -679,6 +521,278 @@ class _ReviewQueuePageState extends State<ReviewQueuePage>
       ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error denying posting: $e')));
     }
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// CERTIFICATES BOTTOM SHEET — stateful so list updates without closing
+// ──────────────────────────────────────────────────────────────────────────────
+class _CertificatesSheet extends StatefulWidget {
+  final int userId;
+  final String name;
+  const _CertificatesSheet({required this.userId, required this.name});
+
+  @override
+  State<_CertificatesSheet> createState() => _CertificatesSheetState();
+}
+
+class _CertificatesSheetState extends State<_CertificatesSheet> {
+  final _db = Supabase.instance.client;
+  List<Map<String, dynamic>> _certs = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCerts();
+  }
+
+  Future<void> _loadCerts() async {
+    final data = await _db
+        .from('Certificates')
+        .select()
+        .eq('user_id', widget.userId)
+        .limit(20);
+    if (mounted) {
+      setState(() {
+        _certs = List<Map<String, dynamic>>.from(data);
+        _loading = false;
+      });
+    }
+  }
+
+  /// Inserts a notification into direct_messages with company_id = null
+  /// so it shows up in the student's existing bell notification list.
+  Future<void> _sendNotification(String certTitle, bool accepted) async {
+    try {
+      await _db.from('direct_messages').insert({
+        'student_id': widget.userId,
+        'company_id': null,
+        'job_id': null,
+        'message': accepted
+            ? '✅ Your certificate "$certTitle" has been accepted and verified by the faculty.'
+            : '❌ Your certificate "$certTitle" has been rejected by the faculty.',
+        'is_read': false,
+        'sent_at': DateTime.now().toIso8601String(),
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _acceptCert(Map<String, dynamic> cert) async {
+    final certTitle = (cert['title'] ?? 'Certificate').toString();
+    final certId = cert['id'];
+    try {
+      await _db
+          .from('Certificates')
+          .update({'is_verified': true})
+          .eq('id', certId);
+      await _sendNotification(certTitle, true);
+      if (!mounted) return;
+      setState(() => _certs.removeWhere((c) => c['id'] == certId));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('✅ "$certTitle" accepted — student notified.'),
+        backgroundColor: Colors.green,
+      ));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
+  Future<void> _rejectCert(Map<String, dynamic> cert) async {
+    final certTitle = (cert['title'] ?? 'Certificate').toString();
+    final certId = cert['id'];
+    try {
+      await _sendNotification(certTitle, false);
+      await _db.from('Certificates').delete().eq('id', certId);
+      if (!mounted) return;
+      setState(() => _certs.removeWhere((c) => c['id'] == certId));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('❌ "$certTitle" rejected — student notified and record removed.'),
+        backgroundColor: Colors.red,
+      ));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
+  Widget _buildImage(String imageUrl) {
+    if (imageUrl.isEmpty) return const SizedBox();
+    if (imageUrl.startsWith('data:image')) {
+      try {
+        final bytes = base64Decode(imageUrl.split(',').last);
+        return Image.memory(bytes,
+            height: 200, width: double.infinity, fit: BoxFit.cover);
+      } catch (_) {
+        return Container(
+            height: 200,
+            color: Colors.grey.shade200,
+            child: const Center(child: Text('Invalid image')));
+      }
+    }
+    return Image.network(imageUrl,
+        height: 200, width: double.infinity, fit: BoxFit.cover);
+  }
+
+  void _showFullImage(String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.black,
+        insetPadding: EdgeInsets.zero,
+        child: Stack(
+          children: [
+            InteractiveViewer(
+              minScale: 1,
+              maxScale: 5,
+              child: Center(
+                child: imageUrl.startsWith('data:image')
+                    ? Image.memory(
+                        base64Decode(imageUrl.split(',').last),
+                        fit: BoxFit.contain)
+                    : Image.network(imageUrl, fit: BoxFit.contain),
+              ),
+            ),
+            Positioned(
+              top: 40,
+              right: 20,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.85,
+      builder: (_, scrollController) {
+        return Container(
+          decoration: BoxDecoration(
+            color: theme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: _loading
+              ? Center(child: CircularProgressIndicator(color: theme.primary))
+              : Column(
+                  children: [
+                    const SizedBox(height: 12),
+                    Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                          color: theme.outline,
+                          borderRadius: BorderRadius.circular(2)),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Certificates: ${widget.name}',
+                      style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: theme.onSurface),
+                    ),
+                    const SizedBox(height: 10),
+                    if (_certs.isEmpty)
+                      Expanded(
+                        child: Center(
+                          child: Text('No pending certificates.',
+                              style:
+                                  TextStyle(color: theme.onSurfaceVariant)),
+                        ),
+                      )
+                    else
+                      Expanded(
+                        child: ListView.builder(
+                          controller: scrollController,
+                          itemCount: _certs.length,
+                          itemBuilder: (context, i) {
+                            final cert = _certs[i];
+                            final imageUrl =
+                                (cert['image_url'] ?? '').toString();
+                            return Card(
+                              margin: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 8),
+                              color: theme.surfaceContainerHighest,
+                              clipBehavior: Clip.antiAlias,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16)),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  ListTile(
+                                    title: Text(
+                                      cert['title'] ?? '',
+                                      style: TextStyle(
+                                          color: theme.onSurface,
+                                          fontWeight: FontWeight.bold),
+                                    ),
+                                    subtitle: Text(
+                                      cert['date']?.toString() ?? '',
+                                      style: TextStyle(
+                                          color: theme.onSurfaceVariant),
+                                    ),
+                                  ),
+                                  if (imageUrl.isNotEmpty)
+                                    GestureDetector(
+                                      onTap: () => _showFullImage(imageUrl),
+                                      child: _buildImage(imageUrl),
+                                    ),
+                                  Padding(
+                                    padding: const EdgeInsets.all(12),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: TextButton(
+                                            onPressed: () =>
+                                                _rejectCert(cert),
+                                            child: const Text('Reject',
+                                                style: TextStyle(
+                                                    color: Colors.red)),
+                                          ),
+                                        ),
+                                        Expanded(
+                                          child: ElevatedButton(
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: theme.primary,
+                                              foregroundColor: theme.onPrimary,
+                                              shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                          8)),
+                                            ),
+                                            onPressed: () =>
+                                                _acceptCert(cert),
+                                            child: const Text('Accept'),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                  ],
+                ),
+        );
+      },
+    );
   }
 }
 

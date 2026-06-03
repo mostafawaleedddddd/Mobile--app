@@ -207,22 +207,28 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _loadMessages(int userId) async {
     try {
+      // Left join so rows with company_id = null (faculty cert notifications)
+      // are included alongside regular company direct messages.
       final rows = await _db
           .from('direct_messages')
-          .select('*, Company_profile!inner(name)')
+          .select('*, Company_profile(name)')
           .eq('student_id', userId)
           .order('sent_at', ascending: false);
 
       if (!mounted) return;
       final msgs = (rows as List).map((r) {
+        final isCert = r['company_id'] == null;
         return {
           'id': r['id'],
           'message': r['message'] as String,
-          'company_name': r['Company_profile']['name'] as String,
+          'company_name': isCert
+              ? 'Faculty'
+              : (r['Company_profile']?['name'] as String? ?? 'Company'),
           'company_id': r['company_id'],
           'job_id': r['job_id'],
           'sent_at': r['sent_at'] as String?,
           'is_read': r['is_read'] as bool? ?? false,
+          'is_cert_notif': isCert,
         };
       }).toList();
 
@@ -2239,6 +2245,7 @@ class _NotificationsSheet extends StatelessWidget {
                       itemBuilder: (_, i) {
                         final msg = messages[i];
                         final isUnread = msg['is_read'] == false;
+                        final isCert = msg['is_cert_notif'] == true;
                         final companyName = msg['company_name'] as String? ?? 'Company';
                         final initials = companyName
                             .trim()
@@ -2247,6 +2254,8 @@ class _NotificationsSheet extends StatelessWidget {
                             .take(2)
                             .map((e) => e[0].toUpperCase())
                             .join();
+                        final msgText = msg['message'] as String? ?? '';
+                        final isAccepted = isCert && msgText.contains('accepted');
 
                         return Container(
                           margin: const EdgeInsets.only(bottom: 10),
@@ -2266,30 +2275,39 @@ class _NotificationsSheet extends StatelessWidget {
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // Company avatar
+                              // Avatar: cert icon for faculty notifs, initials for company
                               Container(
                                 width: 42,
                                 height: 42,
                                 decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    colors: [
-                                      Color(0xFF00C6A7),
-                                      Color(0xFF009E87),
-                                    ],
+                                  gradient: LinearGradient(
+                                    colors: isCert
+                                        ? (isAccepted
+                                            ? [const Color(0xFF10B981), const Color(0xFF059669)]
+                                            : [const Color(0xFFEF4444), const Color(0xFFDC2626)])
+                                        : const [Color(0xFF00C6A7), Color(0xFF009E87)],
                                     begin: Alignment.topLeft,
                                     end: Alignment.bottomRight,
                                   ),
                                   borderRadius: BorderRadius.circular(13),
                                 ),
                                 child: Center(
-                                  child: Text(
-                                    initials,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
+                                  child: isCert
+                                      ? Icon(
+                                          isAccepted
+                                              ? Icons.verified_rounded
+                                              : Icons.cancel_rounded,
+                                          color: Colors.white,
+                                          size: 20,
+                                        )
+                                      : Text(
+                                          initials,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                        ),
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -2301,7 +2319,7 @@ class _NotificationsSheet extends StatelessWidget {
                                       children: [
                                         Expanded(
                                           child: Text(
-                                            companyName,
+                                            isCert ? 'Certificate Update' : companyName,
                                             style: TextStyle(
                                               fontSize: 13,
                                               fontWeight: FontWeight.w700,
@@ -2324,7 +2342,7 @@ class _NotificationsSheet extends StatelessWidget {
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      msg['message'] as String? ?? '',
+                                      msgText,
                                       style: TextStyle(
                                         fontSize: 13,
                                         color: theme.onSurface,
