@@ -327,12 +327,17 @@ class _HomePageState extends State<HomePage> {
         ? SurveyScreen(userId: _userId!, internships: _internships)
         : _buildHomeBody();
 
-    return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      body: body,
-      bottomNavigationBar: _BottomBar(
-        currentIndex: _navIndex,
-        onTap: _handleBottomNavTap,
+    // WillPopScope prevents the user from swiping back or pressing the system
+    // back button to return to the login screen once they are logged in.
+    return WillPopScope(
+      onWillPop: () async => false, // block all back gestures/button
+      child: Scaffold(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        body: body,
+        bottomNavigationBar: _BottomBar(
+          currentIndex: _navIndex,
+          onTap: _handleBottomNavTap,
+        ),
       ),
     );
   }

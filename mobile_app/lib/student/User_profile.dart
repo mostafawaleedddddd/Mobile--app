@@ -1700,36 +1700,67 @@ class _SettingsSheet extends StatefulWidget {
 class _SettingsSheetState extends State<_SettingsSheet> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _phoneCtrl;
+  late final TextEditingController _newPassCtrl;
+  late final TextEditingController _confirmPassCtrl;
   bool _isSaving = false;
+  bool _hideNewPass = true;
+  bool _hideConfirmPass = true;
 
   @override
   void initState() {
     super.initState();
-    _nameCtrl  = TextEditingController(text: widget.currentName);
-    _phoneCtrl = TextEditingController(text: widget.currentPhone);
+    _nameCtrl        = TextEditingController(text: widget.currentName);
+    _phoneCtrl       = TextEditingController(text: widget.currentPhone);
+    _newPassCtrl     = TextEditingController();
+    _confirmPassCtrl = TextEditingController();
   }
 
   @override
   void dispose() {
     _nameCtrl.dispose();
     _phoneCtrl.dispose();
+    _newPassCtrl.dispose();
+    _confirmPassCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _save() async {
     final name  = _nameCtrl.text.trim();
     final phone = _phoneCtrl.text.trim();
+    final newPass = _newPassCtrl.text;
+    final confirmPass = _confirmPassCtrl.text;
+
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Name cannot be empty.')),
       );
       return;
     }
+
+    // Validate password only if user typed something
+    if (newPass.isNotEmpty) {
+      if (newPass.length < 6) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('New password must be at least 6 characters.')),
+        );
+        return;
+      }
+      if (newPass != confirmPass) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Passwords do not match.')),
+        );
+        return;
+      }
+    }
+
     setState(() => _isSaving = true);
     try {
+      final Map<String, dynamic> updates = {'name': name, 'phone': phone};
+      if (newPass.isNotEmpty) updates['password'] = newPass;
+
       await widget.db
           .from('User_profile')
-          .update({'name': name, 'phone': phone})
+          .update(updates)
           .eq('id', widget.userId);
       widget.onSaved();
     } catch (e) {
@@ -1796,6 +1827,57 @@ class _SettingsSheetState extends State<_SettingsSheet> {
             style: TextStyle(fontSize: 14, color: theme.onSurface),
             decoration: _dec(context, '+20 123 456 7890', Icons.phone_outlined),
           ),
+          const SizedBox(height: 18),
+          // ── Password Section ──────────────────────────────────────────────
+          Row(children: [
+            Container(
+              width: 3, height: 18,
+              margin: const EdgeInsets.only(right: 8),
+              decoration: BoxDecoration(color: _blue, borderRadius: BorderRadius.circular(2)),
+            ),
+            Text('Change Password',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: theme.onSurface)),
+            const SizedBox(width: 6),
+            Text('(leave blank to keep current)',
+                style: TextStyle(fontSize: 11, color: theme.onSurfaceVariant)),
+          ]),
+          const SizedBox(height: 10),
+          Text('New Password',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: theme.onSurface)),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _newPassCtrl,
+            obscureText: _hideNewPass,
+            style: TextStyle(fontSize: 14, color: theme.onSurface),
+            decoration: _dec(context, '••••••••', Icons.lock_outline_rounded).copyWith(
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _hideNewPass ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                  size: 18, color: theme.onSurfaceVariant,
+                ),
+                onPressed: () => setState(() => _hideNewPass = !_hideNewPass),
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text('Confirm New Password',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: theme.onSurface)),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _confirmPassCtrl,
+            obscureText: _hideConfirmPass,
+            style: TextStyle(fontSize: 14, color: theme.onSurface),
+            decoration: _dec(context, '••••••••', Icons.lock_outline_rounded).copyWith(
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _hideConfirmPass ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                  size: 18, color: theme.onSurfaceVariant,
+                ),
+                onPressed: () => setState(() => _hideConfirmPass = !_hideConfirmPass),
+              ),
+            ),
+          ),
+          // ─────────────────────────────────────────────────────────────────
           const SizedBox(height: 20),
           SizedBox(
             width: double.infinity, height: 50,

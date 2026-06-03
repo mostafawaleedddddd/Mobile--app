@@ -543,6 +543,7 @@ class _SurveyScreenState extends State<SurveyScreen>
   }
 
   Widget _buildAlreadySubmittedBanner(ColorScheme theme) {
+    final companyName = _selectedInternship?['company'] ?? 'this internship';
     return Container(
       margin: const EdgeInsets.only(top: 12),
       padding: const EdgeInsets.all(16),
@@ -551,16 +552,32 @@ class _SurveyScreenState extends State<SurveyScreen>
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: _accentOrange.withOpacity(0.4)),
       ),
-      child: Row(children: [
-        Container(width: 36, height: 36,
-            decoration: BoxDecoration(color: _accentOrange.withOpacity(0.15), shape: BoxShape.circle),
-            child: const Icon(Icons.info_rounded, color: _accentOrange, size: 20)),
-        const SizedBox(width: 12),
-        Expanded(child: Text(
-          'You already submitted a survey for this internship.',
-          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: theme.onSurface),
-        )),
-      ]),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Container(width: 36, height: 36,
+                decoration: BoxDecoration(color: _accentOrange.withOpacity(0.15), shape: BoxShape.circle),
+                child: const Icon(Icons.assignment_turned_in_rounded, color: _accentOrange, size: 20)),
+            const SizedBox(width: 12),
+            Expanded(child: Text(
+              'Survey Already Submitted',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: _accentOrange),
+            )),
+          ]),
+          const SizedBox(height: 10),
+          Text(
+            'You have already filled out a survey for "$companyName". '
+            'Each internship can only be reviewed once to keep feedback fair and authentic.',
+            style: TextStyle(fontSize: 13, color: theme.onSurface, height: 1.5),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'To review a different internship, please select another company above.',
+            style: TextStyle(fontSize: 12, color: theme.onSurfaceVariant, fontStyle: FontStyle.italic),
+          ),
+        ],
+      ),
     );
   }
 

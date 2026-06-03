@@ -9,6 +9,9 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/external_internship_service.dart';
+import 'StudentHome.dart';
+import 'User_profile.dart';
+import 'survey.dart';
 
 // ─── COLORS (match User_profile.dart palette) ────────────────────────────────
 const _blue      = Color(0xFF3B82F6);
@@ -37,6 +40,9 @@ class _InternshipsPageState extends State<InternshipsPage> with TickerProviderSt
   final _db = Supabase.instance.client;
   late TabController _tabController;
   final _externalService = ExternalInternshipService();
+
+  // Nav
+  final int _navIndex = 1; // Internships is always index 1
 
   // University Internships
   bool _isLoading = true;
@@ -201,24 +207,48 @@ class _InternshipsPageState extends State<InternshipsPage> with TickerProviderSt
         }
         return;
       }
-      
-      final uri = Uri.parse(job.applyUrl);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-        if (mounted) {
-          Navigator.pop(context); // close detail sheet
+
+      // Ensure URL has a scheme; prepend https:// if missing
+      String rawUrl = job.applyUrl.trim();
+      if (!rawUrl.startsWith('http://') && !rawUrl.startsWith('https://')) {
+        rawUrl = 'https://$rawUrl';
+      }
+
+      final uri = Uri.parse(rawUrl);
+
+      // On Android APK, externalApplication mode is the most reliable way
+      // to open URLs in the device browser. We try that first and fall back
+      // to platformDefault (which handles web builds).
+      bool launched = false;
+      try {
+        launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } catch (_) {
+        launched = false;
+      }
+
+      if (!launched) {
+        // Fallback: open in in-app WebView or system default
+        try {
+          launched = await launchUrl(uri, mode: LaunchMode.platformDefault);
+        } catch (_) {
+          launched = false;
         }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Could not open application link')),
-          );
-        }
+      }
+
+      if (!launched && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not open link: $rawUrl')),
+        );
+        return;
+      }
+
+      if (mounted) {
+        Navigator.pop(context); // close detail sheet
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error: $e')));
+            .showSnackBar(SnackBar(content: Text('Error opening link: $e')));
       }
     }
   }
@@ -571,6 +601,36 @@ class _InternshipsPageState extends State<InternshipsPage> with TickerProviderSt
     );
   }
 
+  Future<void> _handleBottomNavTap(int index) async {
+    if (index == 1) return; // already here
+    if (index == 0) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (_) => HomePage(userId: widget.userId),
+        ),
+        (route) => false,
+      );
+      return;
+    }
+    if (index == 2) {
+      await Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => ProfileScreen(id: widget.userId),
+        ),
+      );
+      return;
+    }
+    if (index == 3) {
+      // Pop back to Home and switch to Survey tab via pushAndRemoveUntil
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (_) => const HomeScreen(),
+        ),
+        (route) => false,
+      );
+    }
+  }
+
   // ─── BUILD ───────────────────────────────────────────────────────────────
 
   @override
@@ -579,6 +639,10 @@ class _InternshipsPageState extends State<InternshipsPage> with TickerProviderSt
     
     return Scaffold(
       backgroundColor: theme.surface,
+      bottomNavigationBar: _BottomBar(
+        currentIndex: _navIndex,
+        onTap: _handleBottomNavTap,
+      ),
       body: Stack(
         children: [
           // Background blobs
@@ -1212,4 +1276,68 @@ class _Blob extends StatelessWidget {
         width: size, height: size,
         decoration: BoxDecoration(shape: BoxShape.circle, color: color),
       );
+}
+
+// ─── BOTTOM NAV ──────────────────────────────────────────────────────────────
+class _BottomBar extends StatelessWidget {
+  final int currentIndex;
+  final ValueChanged<int> onTap;
+  const _BottomBar({required this.currentIndex, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.surfaceContainerHighest,
+        boxShadow: [BoxShadow(color: _blue.withOpacity(0.08), blurRadius: 20, offset: const Offset(0, -4))],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _NavItem(icon: Icons.home_rounded,         label: 'Home',        active: currentIndex == 0, onTap: () => onTap(0)),
+              _NavItem(icon: Icons.work_outline_rounded, label: 'Internships', active: currentIndex == 1, onTap: () => onTap(1)),
+              _NavItem(icon: Icons.person_rounded,       label: 'Profile',     active: currentIndex == 2, onTap: () => onTap(2)),
+              _NavItem(icon: Icons.assignment_outlined,  label: 'Surveys',     active: currentIndex == 3, onTap: () => onTap(3)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NavItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool active;
+  final VoidCallback? onTap;
+  const _NavItem({required this.icon, required this.label, required this.active, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context).colorScheme;
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: onTap ?? () {},
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          decoration: BoxDecoration(
+            color: active ? _blue.withOpacity(0.1) : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: active ? _blue : theme.onSurfaceVariant, size: 22),
+        ),
+        const SizedBox(height: 2),
+        Text(label, style: TextStyle(fontSize: 10,
+            color: active ? _blue : theme.onSurfaceVariant,
+            fontWeight: active ? FontWeight.w700 : FontWeight.w400)),
+      ]),
+    );
+  }
 }

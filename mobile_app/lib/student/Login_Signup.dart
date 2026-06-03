@@ -2,7 +2,6 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '/student/StudentHome.dart';
-import '/student/User_profile.dart';
 import '../app_session.dart';
 
 // ─── COLORS ────────────────────────────
@@ -38,6 +37,47 @@ class _AuthScreenState extends State<AuthScreen>
         vsync: this, duration: const Duration(milliseconds: 600));
     _anim = Tween<double>(begin: 0, end: 1).animate(
         CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+
+    // ── Session persistence: if user is already logged in, skip auth screen ──
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkExistingSession();
+    });
+  }
+
+  Future<void> _checkExistingSession() async {
+    // Check AppSession (in-memory) first
+    if (AppSession.userId != null) {
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (_) => HomePage(userId: AppSession.userId!),
+          ),
+          (route) => false,
+        );
+      }
+      return;
+    }
+
+    // Check if there is a saved session via email in AppSession or Supabase
+    final sessionEmail = AppSession.email;
+    if (sessionEmail != null && sessionEmail.isNotEmpty) {
+      try {
+        final user = await Supabase.instance.client
+            .from('User_profile')
+            .select('id')
+            .eq('email', sessionEmail)
+            .maybeSingle();
+        if (user != null && mounted) {
+          AppSession.setUser(userEmail: sessionEmail, id: user['id'] as int);
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(
+              builder: (_) => HomePage(userId: user['id'] as int),
+            ),
+            (route) => false,
+          );
+        }
+      } catch (_) {}
+    }
   }
 
   @override
@@ -252,11 +292,12 @@ class _LoginCardState extends State<_LoginCard> {
       );
 
       if (mounted) {
-        Navigator.pushReplacement(
-          context,
+        // Remove the entire back stack so the user cannot swipe back to AuthScreen.
+        Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(
             builder: (_) => HomePage(userId: data['id'] as int),
           ),
+          (route) => false,
         );
       }
     } catch (e) {
@@ -435,11 +476,13 @@ class _RegisterCardState extends State<_RegisterCard> {
       );
 
       if (mounted) {
-        Navigator.pushReplacement(
-          context,
+        // After signup, go to HomePage and clear the entire back stack so
+        // the user cannot swipe/tap back to the auth screen.
+        Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(
-            builder: (_) => ProfileScreen(id: inserted['id'] as int),
+            builder: (_) => HomePage(userId: inserted['id'] as int),
           ),
+          (route) => false,
         );
       }
     } catch (e) {
