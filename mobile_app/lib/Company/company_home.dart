@@ -1032,6 +1032,154 @@ class _JobMgmtSheetState extends State<_JobMgmtSheet> {
     ctrl.dispose();
   }
 
+  // ── Send a private message to one specific student ──────────────────────────
+  Future<void> _messageSingle(JobApplication app) async {
+    final theme = Theme.of(context).colorScheme;
+    final ctrl = TextEditingController();
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: theme.surfaceContainerHighest,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Row(
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF7C3AED), Color(0xFF4F46E5)],
+                ),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Center(
+                child: Text(
+                  app.initials,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Message ${app.studentName}',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
+                      color: theme.onSurface,
+                    ),
+                  ),
+                  Text(
+                    app.studentEmail,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: theme.onSurfaceVariant,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: ctrl,
+              maxLines: 4,
+              autofocus: true,
+              style: TextStyle(color: theme.onSurface),
+              decoration: InputDecoration(
+                hintText: 'Write your message to ${app.studentName}...',
+                hintStyle: TextStyle(
+                  color: theme.onSurfaceVariant.withOpacity(0.6),
+                  fontSize: 13,
+                ),
+                filled: true,
+                fillColor: theme.surface,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: theme.outline),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: theme.outline),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: _teal, width: 1.8),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Cancel', style: TextStyle(color: theme.onSurfaceVariant)),
+          ),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.pop(context, true),
+            icon: const Icon(Icons.send_rounded, size: 14),
+            label: const Text('Send', style: TextStyle(fontWeight: FontWeight.w700)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _teal,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (ok == true && ctrl.text.trim().isNotEmpty) {
+      try {
+        await Supabase.instance.client.from('direct_messages').insert({
+          'company_id': widget.job.companyId,
+          'student_id': app.studentId,
+          'job_id': widget.job.id,
+          'message': ctrl.text.trim(),
+          'is_read': false,
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('✉️ Message sent to ${app.studentName}!'),
+              backgroundColor: _teal,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              margin: const EdgeInsets.all(16),
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to send message: $e'),
+              backgroundColor: _rejectColor,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              margin: const EdgeInsets.all(16),
+            ),
+          );
+        }
+      }
+    }
+    ctrl.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context).colorScheme;
@@ -1175,6 +1323,7 @@ class _JobMgmtSheetState extends State<_JobMgmtSheet> {
                                   });
                                 }
                               : null,
+                          onMessage: () => _messageSingle(app),
                           onRemove: () async {
                             await widget.onRemove(app);
                             setState(
@@ -1196,7 +1345,13 @@ class _MgmtRow extends StatelessWidget {
   final JobApplication app;
   final VoidCallback? onInterview;
   final VoidCallback onRemove;
-  const _MgmtRow({required this.app, this.onInterview, required this.onRemove});
+  final VoidCallback? onMessage;
+  const _MgmtRow({
+    required this.app,
+    this.onInterview,
+    required this.onRemove,
+    this.onMessage,
+  });
 
   Color get _sc {
     switch (app.status) {
@@ -1324,7 +1479,7 @@ class _MgmtRow extends StatelessWidget {
                       color: _interviewColor,
                     ),
                     label: const Text(
-                      'Request Interview',
+                      'Interview',
                       style: TextStyle(
                         fontSize: 11,
                         color: _interviewColor,
@@ -1343,7 +1498,36 @@ class _MgmtRow extends StatelessWidget {
                     ),
                   ),
                 ),
-              if (onInterview != null) const SizedBox(width: 8),
+              if (onInterview != null) const SizedBox(width: 6),
+              // ── Message button ──────────────────────────────────────────
+              OutlinedButton.icon(
+                onPressed: onMessage,
+                icon: const Icon(
+                  Icons.chat_bubble_outline_rounded,
+                  size: 13,
+                  color: _teal,
+                ),
+                label: const Text(
+                  'Message',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: _teal,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: _teal, width: 1.2),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 8,
+                    horizontal: 10,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              // ── Remove button ───────────────────────────────────────────
               OutlinedButton.icon(
                 onPressed: () => showDialog(
                   context: context,
