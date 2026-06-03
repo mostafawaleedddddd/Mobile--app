@@ -15,12 +15,14 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../app_session.dart';
 import '../theme_provider.dart';
 import 'company_model.dart';
 import 'company_session.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:url_launcher/url_launcher.dart';
+import '../student/UserRole.dart';
 
 // ── COLORS (Brand & Status Accents) ──────────────────────────────────────────
 const _teal = Color(0xFF00C6A7);
@@ -281,7 +283,16 @@ class _CompanyHomePageState extends State<CompanyHomePage> {
         company: _company,
         jobs: _jobs,
         applications: _applications,
-        onLogout: () => Navigator.of(context).pop(),
+        onLogout: () async {
+          await AppSession.clear();
+          CompanySession.clear();
+          await Supabase.instance.client.auth.signOut();
+          if (!mounted) return;
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const UserRole()),
+            (route) => false,
+          );
+        },
         onRefresh: _loadData,
       ),
     ];

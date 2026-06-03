@@ -1060,13 +1060,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _viewCv() async {
     if (_cvUrl.isEmpty) return;
-    final uri = Uri.parse(_cvUrl);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
+
+    final rawUrl = _cvUrl.trim();
+    if (rawUrl.isEmpty) return;
+
+    Uri? uri = Uri.tryParse(rawUrl);
+    if (uri == null || uri.scheme.isEmpty) {
+      uri = Uri.tryParse('https://$rawUrl');
+    }
+
+    if (uri == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not open CV')),
+          const SnackBar(content: Text('CV link is invalid.')),
+        );
+      }
+      return;
+    }
+
+    try {
+      final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!opened && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open CV.')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open CV.')),
         );
       }
     }

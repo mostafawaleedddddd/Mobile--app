@@ -7,6 +7,8 @@ import 'package:provider/provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import '../app_session.dart';
+import '../student/UserRole.dart';
 import '../theme_provider.dart';
 import 'Faculty_Session.dart';
 
@@ -2252,10 +2254,16 @@ class _FacultyProfilePageState extends State<FacultyProfilePage> {
                 style: TextStyle(color: theme.onSurfaceVariant)),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
+              await AppSession.clear();
               FacultySession.clear();
-              Navigator.of(context).popUntil((route) => route.isFirst);
+              await Supabase.instance.client.auth.signOut();
+              if (!mounted) return;
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const UserRole()),
+                (route) => false,
+              );
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
