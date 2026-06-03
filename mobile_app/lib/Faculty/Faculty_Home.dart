@@ -37,11 +37,40 @@ class _FacultyHomePageState extends State<FacultyHomePage> {
     super.initState();
     _pages = [
       ReviewQueuePage(onGoToProfile: () => setState(() => _currentIndex = 4)),
-      PostAnnouncementPage(facultyId: FacultySession.facultyId ?? 0),
+      PostAnnouncementPage(facultyId: widget.facultyId),
       const CompanyManagementPage(),
       const StudentReportPage(),
       FacultyProfilePage(key: _profileKey),
     ];
+    _restoreSession();
+  }
+
+  Future<void> _restoreSession() async {
+    if (FacultySession.facultyId == widget.facultyId && FacultySession.name != null) {
+      return;
+    }
+
+    try {
+      final data = await _db
+          .from('faculty_profile')
+          .select()
+          .eq('id', widget.facultyId)
+          .maybeSingle();
+
+      if (data != null && mounted) {
+        FacultySession.setFaculty(
+          facultyEmail: (data['email'] as String?) ?? '',
+          id: widget.facultyId,
+          facultyName: (data['name'] as String?) ?? 'Faculty Member',
+          dept: data['department'] as String?,
+          title: data['designation'] as String?,
+        );
+        setState(() {});
+      }
+    } catch (_) {
+      // Ignored: if the session cannot be restored immediately, the home screen
+      // will still load and the profile page will refresh later when needed.
+    }
   }
 
   @override
