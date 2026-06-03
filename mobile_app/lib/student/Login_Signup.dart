@@ -45,8 +45,10 @@ class _AuthScreenState extends State<AuthScreen>
   }
 
   Future<void> _checkExistingSession() async {
-    // Check AppSession (in-memory) first
-    if (AppSession.userId != null) {
+    // SplashRouter already handles routing on cold start.
+    // This guard covers the edge case where AuthScreen is somehow reached
+    // while a session is still active (e.g. navigated back manually).
+    if (AppSession.isLoggedIn) {
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(
@@ -55,28 +57,6 @@ class _AuthScreenState extends State<AuthScreen>
           (route) => false,
         );
       }
-      return;
-    }
-
-    // Check if there is a saved session via email in AppSession or Supabase
-    final sessionEmail = AppSession.email;
-    if (sessionEmail != null && sessionEmail.isNotEmpty) {
-      try {
-        final user = await Supabase.instance.client
-            .from('User_profile')
-            .select('id')
-            .eq('email', sessionEmail)
-            .maybeSingle();
-        if (user != null && mounted) {
-          AppSession.setUser(userEmail: sessionEmail, id: user['id'] as int);
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(
-              builder: (_) => HomePage(userId: user['id'] as int),
-            ),
-            (route) => false,
-          );
-        }
-      } catch (_) {}
     }
   }
 
@@ -289,6 +269,7 @@ class _LoginCardState extends State<_LoginCard> {
       AppSession.setUser(
         userEmail: (data['email'] as String?) ?? _emailCtrl.text.trim(),
         id: data['id'] as int,
+        type: 'Student',
       );
 
       if (mounted) {
@@ -473,6 +454,7 @@ class _RegisterCardState extends State<_RegisterCard> {
       AppSession.setUser(
         userEmail: (inserted['email'] as String?) ?? _emailCtrl.text.trim(),
         id: inserted['id'] as int,
+        type: 'Student',
       );
 
       if (mounted) {

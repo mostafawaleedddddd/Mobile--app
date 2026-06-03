@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'Faculty_Session.dart';
 import 'Faculty_Home.dart';
+import '../app_session.dart';
 
 // ─── COLORS (Strict Light Mode Branding) ─────────────────────────────────────
 const _teal          = Color(0xFFFF6B6B);  // primary accent – matches UserRole teal
@@ -247,15 +248,22 @@ class _FacultyLoginCardState extends State<_FacultyLoginCard> {
         facultyEmail: (data['email'] as String?) ?? _emailCtrl.text.trim(),
         id:   data['id'] as int,
         facultyName: (data['name'] ?? 'Faculty Member') as String,
-        dept: data['department'] as String?, // Optional
+        dept: data['department'] as String?,
+      );
+
+      // Persist role so SplashRouter can restore on next launch
+      await AppSession.setUser(
+        userEmail: (data['email'] as String?) ?? _emailCtrl.text.trim(),
+        id:   data['id'] as int,
+        type: 'Faculty',
       );
 
       if (mounted) {
-        Navigator.pushReplacement(
-          context,
+        Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(
             builder: (_) => FacultyHomePage(facultyId: data['id'] as int),
           ),
+          (route) => false,
         );
       }
     } catch (e) {
@@ -458,6 +466,13 @@ class _FacultyRegisterCardState extends State<_FacultyRegisterCard> {
         dept: inserted['department'] as String?,
       );
 
+      // Persist role so SplashRouter can restore on next launch
+      await AppSession.setUser(
+        userEmail: inserted['email'] as String,
+        id:   inserted['id'] as int,
+        type: 'Faculty',
+      );
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -465,11 +480,11 @@ class _FacultyRegisterCardState extends State<_FacultyRegisterCard> {
             backgroundColor: Color(0xFF303F9F),
           ),
         );
-        Navigator.pushReplacement(
-          context,
+        Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(
             builder: (_) => FacultyHomePage(facultyId: inserted['id'] as int),
           ),
+          (route) => false,
         );
       }
     } catch (e) {

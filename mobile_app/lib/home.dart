@@ -4,16 +4,23 @@ import 'student/onboarding_page2.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
 import 'theme_provider.dart';
+import 'app_session.dart';
+import 'student/StudentHome.dart';
+import 'Company/company_home.dart';
+import 'Faculty/Faculty_Home.dart';
 // ── Page 1: Internship Seeker ──────────
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: '.env');
-       print("ENV LOADED");
-      print(dotenv.env);
+      
   await Supabase.initialize(
     url: 'https://vkkwzzrpmdkvgnxlvddz.supabase.co',
     anonKey: 'sb_publishable_q_3tICsMxAFw8x0tyMzBPQ_RrN6h_be',
   );
+
+  // ── Load persisted session before the first frame ──────────────────────
+  await AppSession.load();
+
   runApp(
     ChangeNotifierProvider(
       create: (context) => ThemeProvider(),
@@ -29,9 +36,67 @@ class _App extends StatelessWidget {
         builder: (context, themeProvider, child) => MaterialApp(
           debugShowCheckedModeBanner: false,
           theme: themeProvider.currentTheme,
-          home: const OnboardingPage1(),
+          home: const SplashRouter(),   // ← routes based on saved session
         ),
       );
+}
+
+// ─── SPLASH ROUTER ───────────────────────────────────────────────────────────
+// Shown for a split second on launch. Reads the already-loaded AppSession and
+// immediately pushes the correct home screen, or falls through to onboarding.
+class SplashRouter extends StatefulWidget {
+  const SplashRouter({super.key});
+  @override
+  State<SplashRouter> createState() => _SplashRouterState();
+}
+
+class _SplashRouterState extends State<SplashRouter> {
+  @override
+  void initState() {
+    super.initState();
+    // AppSession.load() already ran in main(), so values are ready immediately.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _route());
+  }
+
+  void _route() {
+    if (!AppSession.isLoggedIn) {
+      // No saved session → show normal onboarding
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const OnboardingPage1()),
+      );
+      return;
+    }
+
+    // Saved session found → route by account type
+    final id   = AppSession.userId!;
+    final type = AppSession.accountType!;
+
+    Widget destination;
+    switch (type) {
+      case 'Company':
+        destination = CompanyHomePage(companyId: id);
+        break;
+      case 'Faculty':
+        destination = FacultyHomePage(facultyId: id);
+        break;
+      case 'Student':
+      default:
+        destination = HomePage(userId: id);
+        break;
+    }
+
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => destination),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Blank screen shown for the single frame before _route() fires
+    return const Scaffold(
+      body: Center(child: CircularProgressIndicator()),
+    );
+  }
 }
 
 class OnboardingPage1 extends StatelessWidget {

@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'company_session.dart';
 import 'company_home.dart';
+import '../app_session.dart';
 
 // ─── COLORS (Strict Light Mode Branding) ─────────────────────────────────────
 const _teal     = Color(0xFF00C6A7);   
@@ -253,12 +254,19 @@ class _LoginCardState extends State<_LoginCard> {
         name: (data['name'] ?? 'Company') as String,
       );
 
+      // Also persist role to AppSession so SplashRouter can restore it
+      await AppSession.setUser(
+        userEmail: (data['email'] as String?) ?? _emailCtrl.text.trim(),
+        id:   data['id'] as int,
+        type: 'Company',
+      );
+
       if (mounted) {
-        Navigator.pushReplacement(
-          context,
+        Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(
             builder: (_) => CompanyHomePage(companyId: data['id'] as int),
           ),
+          (route) => false,
         );
       }
     } catch (e) {
@@ -461,6 +469,13 @@ class _RegisterCardState extends State<_RegisterCard> {
         name: inserted['name'] as String,
       );
 
+      // Persist role so SplashRouter can restore on next launch
+      await AppSession.setUser(
+        userEmail: inserted['email'] as String,
+        id:   inserted['id'] as int,
+        type: 'Company',
+      );
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -468,11 +483,11 @@ class _RegisterCardState extends State<_RegisterCard> {
             backgroundColor: _teal,
           ),
         );
-        Navigator.pushReplacement(
-          context,
+        Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(
             builder: (_) => CompanyHomePage(companyId: inserted['id'] as int),
           ),
+          (route) => false,
         );
       }
     } catch (e) {

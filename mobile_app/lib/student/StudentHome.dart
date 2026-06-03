@@ -193,7 +193,7 @@ class _HomePageState extends State<HomePage> {
       });
 
       if (user != null) {
-        AppSession.setUser(userEmail: _email, id: user['id'] as int);
+        await AppSession.setUser(userEmail: _email, id: user['id'] as int, type: 'Student');
         await _loadMessages(user['id'] as int);
       }
     } catch (e) {
@@ -207,28 +207,22 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _loadMessages(int userId) async {
     try {
-      // Left join so rows with company_id = null (faculty cert notifications)
-      // are included alongside regular company direct messages.
       final rows = await _db
           .from('direct_messages')
-          .select('*, Company_profile(name)')
+          .select('*, Company_profile!inner(name)')
           .eq('student_id', userId)
           .order('sent_at', ascending: false);
 
       if (!mounted) return;
       final msgs = (rows as List).map((r) {
-        final isCert = r['company_id'] == null;
         return {
           'id': r['id'],
           'message': r['message'] as String,
-          'company_name': isCert
-              ? 'Faculty'
-              : (r['Company_profile']?['name'] as String? ?? 'Company'),
+          'company_name': r['Company_profile']['name'] as String,
           'company_id': r['company_id'],
           'job_id': r['job_id'],
           'sent_at': r['sent_at'] as String?,
           'is_read': r['is_read'] as bool? ?? false,
-          'is_cert_notif': isCert,
         };
       }).toList();
 
@@ -258,47 +252,13 @@ class _HomePageState extends State<HomePage> {
     } catch (_) {}
   }
 
-  Future<void> _openNotifications(BuildContext iconCtx) async {
-    await _markMessagesRead();
-
-    final renderBox = iconCtx.findRenderObject() as RenderBox?;
-    final overlay = Overlay.of(iconCtx).context.findRenderObject() as RenderBox?;
-    Rect rect = const Rect.fromLTWH(0, 0, 40, 40);
-
-    if (renderBox != null && overlay != null) {
-      final offset = renderBox.localToGlobal(Offset.zero, ancestor: overlay);
-      rect = offset & renderBox.size;
-    }
-
-    final menuWidth = MediaQuery.of(context).size.width;
-    final maxHeight = MediaQuery.of(context).size.height * 0.78;
-    final itemHeight = 88.0;
-    final contentHeight = ((
-      _messages.length * itemHeight + 88
-    ).clamp(180.0, maxHeight)).toDouble();
-
-    if (!mounted) return;
-
-    await showMenu(
+  void _openNotifications() {
+    _markMessagesRead();
+    showModalBottomSheet(
       context: context,
-      position: RelativeRect.fromLTRB(rect.left, rect.bottom, rect.right, rect.top),
-      color: Theme.of(context).colorScheme.surface,
-      elevation: 8,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      items: [
-        PopupMenuItem(
-          enabled: false,
-          padding: EdgeInsets.zero,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: menuWidth),
-            child: SizedBox(
-              width: menuWidth,
-              height: contentHeight,
-              child: _NotificationsPopup(messages: _messages),
-            ),
-          ),
-        ),
-      ],
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _NotificationsSheet(messages: _messages),
     );
   }
 
@@ -518,59 +478,57 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
           // ── Notification bell ────────────────────────────────────────────
-          Builder(
-            builder: (iconCtx) => GestureDetector(
-              onTap: () => _openNotifications(iconCtx),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    margin: const EdgeInsets.only(right: 4),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.06),
-                          blurRadius: 10,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: Icon(
-                      Icons.notifications_none_rounded,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      size: 20,
-                    ),
+          GestureDetector(
+            onTap: _openNotifications,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  margin: const EdgeInsets.only(right: 4),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.06),
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
                   ),
-                  if (_unreadMessageCount > 0)
-                    Positioned(
-                      right: 4,
-                      top: 0,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEF4444),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: Theme.of(context).colorScheme.surface,
-                            width: 1.5,
-                          ),
+                  child: Icon(
+                    Icons.notifications_none_rounded,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    size: 20,
+                  ),
+                ),
+                if (_unreadMessageCount > 0)
+                  Positioned(
+                    right: 4,
+                    top: 0,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEF4444),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: Theme.of(context).colorScheme.surface,
+                          width: 1.5,
                         ),
-                        child: Text(
-                          _unreadMessageCount > 9 ? '9+' : '$_unreadMessageCount',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 8,
-                            fontWeight: FontWeight.w700,
-                          ),
+                      ),
+                      child: Text(
+                        _unreadMessageCount > 9 ? '9+' : '$_unreadMessageCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 8,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
-                ],
-              ),
+                  ),
+              ],
             ),
           ),
           // ── Avatar ───────────────────────────────────────────────────────
@@ -2142,9 +2100,9 @@ class _AllApplicationsScreenState extends State<AllApplicationsScreen> {
 // ─────────────────────────────────────────────────────────────────────────────
 // NOTIFICATIONS BOTTOM SHEET  (student side — company direct messages)
 // ─────────────────────────────────────────────────────────────────────────────
-class _NotificationsPopup extends StatelessWidget {
+class _NotificationsSheet extends StatelessWidget {
   final List<Map<String, dynamic>> messages;
-  const _NotificationsPopup({required this.messages});
+  const _NotificationsSheet({required this.messages});
 
   String _timeAgo(String? iso) {
     if (iso == null) return '';
@@ -2162,171 +2120,239 @@ class _NotificationsPopup extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context).colorScheme;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.surface,
-        borderRadius: const BorderRadius.all(Radius.circular(18)),
-      ),
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-            child: Row(
-              children: [
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: theme.primary.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    Icons.notifications_rounded,
-                    color: theme.primary,
-                    size: 20,
-                  ),
+    return DraggableScrollableSheet(
+      initialChildSize: 0.65,
+      minChildSize: 0.4,
+      maxChildSize: 0.92,
+      builder: (_, sc) => Container(
+        decoration: BoxDecoration(
+          color: theme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          children: [
+            // Handle
+            Center(
+              child: Container(
+                margin: const EdgeInsets.only(top: 12, bottom: 8),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: theme.outline,
+                  borderRadius: BorderRadius.circular(2),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Notifications',
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w800,
-                          color: theme.onSurface,
-                        ),
-                      ),
-                      Text(
-                        '${messages.length} message${messages.length == 1 ? '' : 's'} from companies',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: theme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
-          const Divider(height: 1),
-          Expanded(
-            child: messages.isEmpty
-                ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(18),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.notifications_none_rounded, color: theme.primary, size: 30),
-                          const SizedBox(height: 10),
-                          Text('No messages yet', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: theme.onSurface)),
-                          const SizedBox(height: 4),
-                          Text('Messages from companies will appear here', style: TextStyle(fontSize: 13, color: theme.onSurfaceVariant), textAlign: TextAlign.center),
-                        ],
-                      ),
+            // Title row
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              child: Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: theme.primary.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 14),
-                    itemCount: messages.length,
-                    itemBuilder: (_, i) {
-                      final msg = messages[i];
-                      final isUnread = msg['is_read'] == false;
-                      final isCert = msg['is_cert_notif'] == true;
-                      final companyName = msg['company_name'] as String? ?? 'Company';
-                      final initials = companyName
-                          .trim()
-                          .split(' ')
-                          .where((e) => e.isNotEmpty)
-                          .take(2)
-                          .map((e) => e[0].toUpperCase())
-                          .join();
-                      final msgText = msg['message'] as String? ?? '';
-                      final isAccepted = isCert && msgText.contains('accepted');
-
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 10),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: isUnread ? theme.primary.withOpacity(0.06) : theme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: isUnread ? theme.primary.withOpacity(0.25) : theme.outline),
+                    child: Icon(
+                      Icons.notifications_rounded,
+                      color: theme.primary,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Notifications',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                            color: theme.onSurface,
+                          ),
                         ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        Text(
+                          '${messages.length} message${messages.length == 1 ? '' : 's'} from companies',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: theme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Divider(color: theme.outline, height: 1),
+            // Messages list
+            Expanded(
+              child: messages.isEmpty
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 60),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             Container(
-                              width: 40,
-                              height: 40,
+                              width: 68,
+                              height: 68,
                               decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: isCert
-                                      ? (isAccepted
-                                          ? [const Color(0xFF10B981), const Color(0xFF059669)]
-                                          : [const Color(0xFFEF4444), const Color(0xFFDC2626)])
-                                      : const [Color(0xFF00C6A7), Color(0xFF009E87)],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                                borderRadius: BorderRadius.circular(12),
+                                color: theme.primary.withOpacity(0.08),
+                                borderRadius: BorderRadius.circular(20),
                               ),
-                              child: Center(
-                                child: isCert
-                                    ? Icon(
-                                        isAccepted ? Icons.verified_rounded : Icons.cancel_rounded,
-                                        color: Colors.white,
-                                        size: 18,
-                                      )
-                                    : Text(
-                                        initials,
-                                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w800),
-                                      ),
+                              child: Icon(
+                                Icons.notifications_none_rounded,
+                                color: theme.primary,
+                                size: 32,
                               ),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          isCert ? 'Certificate Update' : companyName,
-                                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: theme.onSurface),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                      if (isUnread)
-                                        Container(
-                                          width: 8,
-                                          height: 8,
-                                          margin: const EdgeInsets.only(left: 6),
-                                          decoration: BoxDecoration(color: theme.primary, shape: BoxShape.circle),
-                                        ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    msgText,
-                                    style: TextStyle(fontSize: 13.2, color: theme.onSurface, height: 1.35, fontWeight: isUnread ? FontWeight.w500 : FontWeight.w400),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(_timeAgo(msg['sent_at'] as String?), style: TextStyle(fontSize: 12, color: theme.onSurfaceVariant)),
-                                ],
+                            const SizedBox(height: 16),
+                            Text(
+                              'No messages yet',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: theme.onSurface,
                               ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Messages from companies will appear here',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: theme.onSurfaceVariant,
+                              ),
+                              textAlign: TextAlign.center,
                             ),
                           ],
                         ),
-                      );
-                    },
-                  ),
-          ),
-        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      controller: sc,
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                      itemCount: messages.length,
+                      itemBuilder: (_, i) {
+                        final msg = messages[i];
+                        final isUnread = msg['is_read'] == false;
+                        final companyName = msg['company_name'] as String? ?? 'Company';
+                        final initials = companyName
+                            .trim()
+                            .split(' ')
+                            .where((e) => e.isNotEmpty)
+                            .take(2)
+                            .map((e) => e[0].toUpperCase())
+                            .join();
+
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: isUnread
+                                ? theme.primary.withOpacity(0.06)
+                                : theme.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(16),
+                            border: isUnread
+                                ? Border.all(
+                                    color: theme.primary.withOpacity(0.3),
+                                    width: 1,
+                                  )
+                                : Border.all(color: theme.outline),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Company avatar
+                              Container(
+                                width: 42,
+                                height: 42,
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [
+                                      Color(0xFF00C6A7),
+                                      Color(0xFF009E87),
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(13),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    initials,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            companyName,
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w700,
+                                              color: theme.onSurface,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        if (isUnread)
+                                          Container(
+                                            width: 8,
+                                            height: 8,
+                                            margin: const EdgeInsets.only(left: 6),
+                                            decoration: BoxDecoration(
+                                              color: theme.primary,
+                                              shape: BoxShape.circle,
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      msg['message'] as String? ?? '',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: theme.onSurface,
+                                        height: 1.4,
+                                        fontWeight: isUnread
+                                            ? FontWeight.w500
+                                            : FontWeight.w400,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      _timeAgo(msg['sent_at'] as String?),
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: theme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }

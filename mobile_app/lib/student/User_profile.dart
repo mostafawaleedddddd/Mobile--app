@@ -344,9 +344,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         currentPhone: _user?['phone'] ?? '',
         db: _db,
         onSaved: () { Navigator.pop(ctx); _fetchAll(); },
-        onLogout: () {
+        onLogout: () async {
           Navigator.pop(ctx);
-          AppSession.clear();
+          await AppSession.clear();
           Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(builder: (_) => const UserRole()),
             (route) => false,
