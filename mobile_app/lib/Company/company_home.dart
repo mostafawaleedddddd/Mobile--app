@@ -1011,13 +1011,26 @@ class _JobMgmtSheetState extends State<_JobMgmtSheet> {
       ),
     );
     if (ok == true && ctrl.text.trim().isNotEmpty) {
+      final text = ctrl.text.trim();
       try {
-        await Supabase.instance.client.from('Job_messages').insert({
-          'company_id': widget.job.companyId,
-          'job_id': widget.job.id,
-          'message': ctrl.text.trim(),
-        });
-      } catch (_) {}
+        // build unique list of student ids to message
+        final ids = _apps.map((a) => a.studentId).where((id) => id != null).toSet().toList();
+        if (ids.isNotEmpty) {
+          final payloads = ids
+              .map((sid) => {
+                    'company_id': widget.job.companyId,
+                    'student_id': sid,
+                    'job_id': widget.job.id,
+                    'message': text,
+                    'is_read': false,
+                  })
+              .toList();
+
+          await Supabase.instance.client.from('direct_messages').insert(payloads);
+        }
+      } catch (e) {
+        // ignore or log
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
