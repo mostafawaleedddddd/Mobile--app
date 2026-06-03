@@ -724,13 +724,7 @@ class ResumeAnalyzerScreen extends StatefulWidget {
 }
 
 class _ResumeAnalyzerScreenState extends State<ResumeAnalyzerScreen> {
-  // ── Gemini credentials loaded from .env ───────────────────────────────────
-  // dotenv.env['GEMINI_API_KEY'] reads the value you set in your .env file.
-  // The null-coalescing fallback ('') means the app won't crash if the key
-  // is missing — it will simply return a 400 from Gemini instead.
   String get _apiKey => dotenv.env['GEMINI_API_KEY'] ?? '';
-
-  // Gemini Flash model endpoint. The API key is appended as a query param.
   String get _url =>
       'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=$_apiKey';
 

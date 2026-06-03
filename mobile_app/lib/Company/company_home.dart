@@ -18,6 +18,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../theme_provider.dart';
 import 'company_model.dart';
 import 'company_session.dart';
+import 'dart:convert';
+import 'dart:typed_data';
+import 'package:url_launcher/url_launcher.dart';
 
 // ── COLORS (Brand & Status Accents) ──────────────────────────────────────────
 const _teal = Color(0xFF00C6A7);
@@ -2441,6 +2444,7 @@ class _ProfileSheetState extends State<_ProfileSheet> {
   String _about = '';
   List<String> _skills = [];
   List<Map<String, dynamic>> _certs = [];
+  String _cvUrl = '';
 
   @override
   void initState() {
@@ -2474,11 +2478,99 @@ class _ProfileSheetState extends State<_ProfileSheet> {
           _certs = (certs as List)
               .map((c) => c as Map<String, dynamic>)
               .toList();
+          _cvUrl = (info?['cv_url'] ?? '') as String;
           _loading = false;
         });
       }
     } catch (_) {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Uint8List? _decodeCertificateImageValue(String? value) {
+    if (value == null || value.isEmpty || !value.startsWith('data:')) return null;
+    final commaIndex = value.indexOf(',');
+    if (commaIndex == -1 || commaIndex >= value.length - 1) return null;
+    try {
+      return base64Decode(value.substring(commaIndex + 1));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  void _showCertificate(Map<String, dynamic> item) {
+    final imageUrl = (item['image_url'] ?? '').toString();
+    if (imageUrl.isEmpty) return;
+    final imageBytes = _decodeCertificateImageValue(imageUrl);
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        final theme = Theme.of(ctx).colorScheme;
+        return Dialog(
+          backgroundColor: theme.surfaceContainerHighest,
+          insetPadding: const EdgeInsets.all(20),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        (item['title'] ?? 'Certificate').toString(),
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: theme.onSurface),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      icon: Icon(Icons.close_rounded, color: theme.onSurfaceVariant),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: imageBytes != null
+                      ? Image.memory(imageBytes, fit: BoxFit.contain)
+                      : Image.network(
+                          imageUrl,
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, _, __) => Container(
+                            height: 220,
+                            color: _teal.withOpacity(0.1),
+                            child: const Center(
+                              child: Icon(Icons.broken_image_outlined, color: _teal, size: 36),
+                            ),
+                          ),
+                        ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _viewCv() async {
+    if (_cvUrl.isEmpty) return;
+    try {
+      final uri = Uri.parse(_cvUrl);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not open CV')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not open CV: $e')));
     }
   }
 
@@ -2725,6 +2817,48 @@ class _ProfileSheetState extends State<_ProfileSheet> {
                                 ),
                           const SizedBox(height: 24),
 
+                          // CV / Resume
+                          _SecTitle('CV / Resume', Icons.picture_as_pdf_rounded),
+                          const SizedBox(height: 10),
+                          _cvUrl.isEmpty
+                              ? const _EmptyField('No CV uploaded.')
+                              : Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: theme.surfaceContainerHighest,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: theme.outline),
+                                  ),
+                                  child: Row(children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(10),
+                                      decoration: BoxDecoration(
+                                        color: _teal.withOpacity(0.08),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Icon(Icons.picture_as_pdf_rounded, color: _teal, size: 28),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                        Text('CV / Resume', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: theme.onSurface)),
+                                        const SizedBox(height: 2),
+                                        Text('PDF, DOC, or DOCX', style: TextStyle(fontSize: 12, color: theme.onSurfaceVariant)),
+                                      ]),
+                                    ),
+                                    OutlinedButton.icon(
+                                      onPressed: _viewCv,
+                                      icon: const Icon(Icons.visibility_rounded, size: 18),
+                                      label: const Text('View CV'),
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: _teal,
+                                        side: BorderSide(color: _teal),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                      ),
+                                    ),
+                                  ]),
+                                ),
+
                           // Certificates
                           _SecTitle(
                             'Certificates (${_certs.length})',
@@ -2735,15 +2869,15 @@ class _ProfileSheetState extends State<_ProfileSheet> {
                               ? const _EmptyField('No certificates uploaded.')
                               : Column(
                                   children: _certs
-                                      .map(
-                                        (c) => Container(
+                                      .map((c) {
+                                        final hasImage = (c['image_url'] as String?)?.isNotEmpty == true;
+                                        final card = Container(
                                           margin: const EdgeInsets.only(
                                             bottom: 10,
                                           ),
                                           padding: const EdgeInsets.all(14),
                                           decoration: BoxDecoration(
-                                            color:
-                                                theme.surfaceContainerHighest,
+                                            color: theme.surfaceContainerHighest,
                                             borderRadius: BorderRadius.circular(
                                               14,
                                             ),
@@ -2815,9 +2949,7 @@ class _ProfileSheetState extends State<_ProfileSheet> {
                                                   ],
                                                 ),
                                               ),
-                                              if ((c['image_url'] as String?)
-                                                      ?.isNotEmpty ==
-                                                  true)
+                                              if (hasImage)
                                                 const Icon(
                                                   Icons.image_outlined,
                                                   size: 18,
@@ -2825,9 +2957,16 @@ class _ProfileSheetState extends State<_ProfileSheet> {
                                                 ),
                                             ],
                                           ),
-                                        ),
-                                      )
-                                      .toList(),
+                                        );
+
+                                        return hasImage
+                                            ? InkWell(
+                                                borderRadius: BorderRadius.circular(14),
+                                                onTap: () => _showCertificate(c),
+                                                child: card,
+                                              )
+                                            : card;
+                                      }).toList(),
                                 ),
 
                           // Action buttons if pending

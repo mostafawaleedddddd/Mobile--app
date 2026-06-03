@@ -1,5 +1,6 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // EXTERNAL INTERNSHIP MODEL
@@ -26,9 +27,12 @@ class ExternalInternship {
 // EXTERNAL INTERNSHIP SERVICE
 // ─────────────────────────────────────────────────────────────────────────────
 class ExternalInternshipService {
-  static const String _apiHost = 'jsearch.p.rapidapi.com';
-  static const String _apiKey =
-      '8475cc7791msh1f6a3b83ab37424p17b8aejsnefc446b01106'; // Replace with actual API key
+  static String get _apiHost =>
+      dotenv.env['JSEARCH_API_HOST'] ?? '';
+  static String get _remotiveApiHost =>
+      dotenv.env['REMOTIVE_API_HOST'] ?? '';
+  static String get _apiKey =>
+      dotenv.env['JSEARCH_API_KEY'] ?? '';
   static const List<String> _csKeywords = [
     'software',
     'software engineer',
@@ -106,8 +110,46 @@ class ExternalInternshipService {
         lowerLocation.contains('alexandria');
   }
 
-  /// Search for external internships from JSearch API
+  /// Search for external internships from JSearch and Remotive APIs.
   Future<List<ExternalInternship>> searchInternships({
+    String? query,
+    int page = 1,
+  }) async {
+    final internships = <ExternalInternship>[];
+    final errors = <Object>[];
+
+    try {
+      internships.addAll(await _searchJSearchInternships(query: query, page: page));
+    } catch (e) {
+      errors.add(e);
+      print('JSearch internship API failed: $e');
+    }
+
+    try {
+      internships.addAll(await _searchRemotiveInternships(query: query));
+    } catch (e) {
+      errors.add(e);
+      print('Remotive internship API failed: $e');
+    }
+
+    final uniqueInternships = _dedupeInternships(internships);
+    if (uniqueInternships.isNotEmpty || errors.isEmpty) {
+      return uniqueInternships;
+    }
+
+    if (errors.length == 1) {
+      final error = errors.first;
+      if (error is Exception) {
+        throw error;
+      }
+      throw Exception(error.toString());
+    }
+
+    throw Exception('All external internship APIs failed: ${errors.join(' | ')}');
+  }
+
+  /// Search for external internships from JSearch API.
+  Future<List<ExternalInternship>> _searchJSearchInternships({
     String? query,
     int page = 1,
   }) async {
@@ -214,6 +256,84 @@ class ExternalInternshipService {
     }
   }
 
+  /// Search for external internships from Remotive public API.
+  Future<List<ExternalInternship>> _searchRemotiveInternships({
+    String? query,
+  }) async {
+    try {
+      final searchQuery = [
+        if (query?.trim().isNotEmpty ?? false) query!.trim(),
+        'internship',
+      ].join(' ');
+
+      final url = Uri.https(_remotiveApiHost, '/api/remote-jobs', {
+        'search': searchQuery,
+        'category': 'software-dev',
+        'limit': '50',
+      });
+      print('Remotive internship query: $searchQuery');
+
+      final response = await http.get(url).timeout(
+            const Duration(seconds: 15),
+            onTimeout: () => throw TimeoutException('Remotive request timed out'),
+          );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final jobsRaw = data['jobs'] as List<dynamic>?;
+        print('Total jobs from Remotive API: ${jobsRaw?.length}');
+        if (jobsRaw == null || jobsRaw.isEmpty) {
+          print('Remotive internship response: $data');
+          return [];
+        }
+
+        final internships = <ExternalInternship>[];
+        for (final jobRaw in jobsRaw) {
+          final job = jobRaw as Map<String, dynamic>;
+          final title = job['title'] as String? ?? '';
+          final jobType = job['job_type'] as String? ?? '';
+          final description = _stripHtmlTags(
+            job['description'] as String? ?? 'No description available',
+          );
+
+          if (!_isInternshipRole('$title $jobType $description')) {
+            print('Rejected Remotive job: Not internship');
+            continue;
+          }
+
+          print('Accepted Remotive job: $title');
+
+          internships.add(
+            ExternalInternship(
+              title: title,
+              company: job['company_name'] as String? ?? '',
+              location:
+                  job['candidate_required_location'] as String? ?? 'Remote',
+              description: description,
+              applyUrl: job['url'] as String? ?? '',
+              employmentType: jobType.isNotEmpty ? jobType : 'Remote',
+            ),
+          );
+        }
+
+        print('Total jobs from Remotive API after: ${internships.length}');
+        return internships;
+      } else if (response.statusCode == 429) {
+        throw RateLimitException(
+          'Remotive rate limit exceeded. Please try again later.',
+        );
+      } else {
+        throw Exception('Remotive API error: ${response.statusCode}');
+      }
+    } on TimeoutException {
+      rethrow;
+    } on RateLimitException {
+      rethrow;
+    } catch (e) {
+      throw Exception('Remotive network error: $e');
+    }
+  }
+
   /// Only keep jobs whose apply URL is LinkedIn
   static bool _isLinkedInJob(Map<String, dynamic> job) {
     final url = _getApplyUrl(job).toLowerCase();
@@ -238,9 +358,37 @@ class ExternalInternshipService {
   }
 
   /// Check if job title contains internship keywords
-  static bool _isInternshipRole(String title) {
-    final lowerTitle = title.toLowerCase();
-    return _internshipKeywords.any((keyword) => lowerTitle.contains(keyword));
+  static bool _isInternshipRole(String text) {
+    final lowerText = text.toLowerCase();
+    return _internshipKeywords.any((keyword) => lowerText.contains(keyword));
+  }
+
+  static List<ExternalInternship> _dedupeInternships(
+    List<ExternalInternship> internships,
+  ) {
+    final seen = <String>{};
+    final uniqueInternships = <ExternalInternship>[];
+
+    for (final internship in internships) {
+      final key =
+          internship.applyUrl.trim().isNotEmpty
+              ? internship.applyUrl.trim().toLowerCase()
+              : '${internship.title}|${internship.company}|${internship.location}'
+                  .toLowerCase();
+
+      if (seen.add(key)) {
+        uniqueInternships.add(internship);
+      }
+    }
+
+    return uniqueInternships;
+  }
+
+  static String _stripHtmlTags(String html) {
+    return html
+        .replaceAll(RegExp(r'<[^>]*>'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
   }
 
   /// Format location from job data
