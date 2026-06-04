@@ -280,7 +280,7 @@ class _LoginCardState extends State<_LoginCard> {
       }
 
       // user found — navigate to THEIR profile using their id
-      AppSession.setUser(
+      await AppSession.setUser(
         userEmail: (data['email'] as String?) ?? _emailCtrl.text.trim(),
         id: data['id'] as int,
         type: 'Student',
@@ -465,7 +465,7 @@ class _RegisterCardState extends State<_RegisterCard> {
           .select()
           .single();
 
-      AppSession.setUser(
+      await AppSession.setUser(
         userEmail: (inserted['email'] as String?) ?? _emailCtrl.text.trim(),
         id: inserted['id'] as int,
         type: 'Student',
