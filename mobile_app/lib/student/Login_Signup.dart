@@ -2,6 +2,8 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '/student/StudentHome.dart';
+import '../Company/company_home.dart';
+import '../Faculty/Faculty_Home.dart';
 import '../app_session.dart';
 
 // ─── COLORS ────────────────────────────
@@ -49,14 +51,26 @@ class _AuthScreenState extends State<AuthScreen>
     // This guard covers the edge case where AuthScreen is somehow reached
     // while a session is still active (e.g. navigated back manually).
     if (AppSession.isLoggedIn) {
-      if (mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(
-            builder: (_) => HomePage(userId: AppSession.userId!),
-          ),
-          (route) => false,
-        );
+      if (!mounted) return;
+
+      Widget destination;
+      switch (AppSession.accountType) {
+        case 'Company':
+          destination = CompanyHomePage(companyId: AppSession.userId!);
+          break;
+        case 'Faculty':
+          destination = FacultyHomePage(facultyId: AppSession.userId!);
+          break;
+        case 'Student':
+        default:
+          destination = HomePage(userId: AppSession.userId!);
+          break;
       }
+
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => destination),
+        (route) => false,
+      );
     }
   }
 

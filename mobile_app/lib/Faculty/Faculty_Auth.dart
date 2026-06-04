@@ -4,6 +4,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'Faculty_Session.dart';
 import 'Faculty_Home.dart';
 import '../app_session.dart';
+import '../student/StudentHome.dart';
+import '../Company/company_home.dart';
 
 // ─── COLORS (Strict Light Mode Branding) ─────────────────────────────────────
 const _teal          = Color(0xFFFF6B6B);  // primary accent – matches UserRole teal
@@ -41,6 +43,29 @@ class _FacultyAuthScreenState extends State<FacultyAuthScreen>
         vsync: this, duration: const Duration(milliseconds: 600));
     _anim = Tween<double>(begin: 0, end: 1)
         .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkExistingSession());
+  }
+
+  Future<void> _checkExistingSession() async {
+    if (!AppSession.isLoggedIn || !mounted) return;
+    Widget destination;
+    switch (AppSession.accountType) {
+      case 'Company':
+        destination = CompanyHomePage(companyId: AppSession.userId!);
+        break;
+      case 'Faculty':
+        destination = FacultyHomePage(facultyId: AppSession.userId!);
+        break;
+      case 'Student':
+      default:
+        destination = HomePage(userId: AppSession.userId!);
+        break;
+    }
+
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => destination),
+      (route) => false,
+    );
   }
 
   @override
