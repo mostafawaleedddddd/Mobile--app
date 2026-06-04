@@ -292,6 +292,7 @@ class _HomePageState extends State<HomePage> {
               top: top,
               left: 110,
               right: 0,
+              bottom: 250,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: Material(
